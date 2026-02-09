@@ -285,7 +285,11 @@ const MembersList = () => {
 
   const normalizePhone = (phone) => {
     if (!phone) return "";
-    return String(phone).replace(/[^\d]/g, "");
+    let digits = String(phone).replace(/[^\d]/g, "");
+    if (digits.startsWith("0")) digits = digits.slice(1);
+    if (digits.startsWith("91") && digits.length === 12) return digits;
+    if (digits.length === 10) return `91${digits}`;
+    return digits;
   };
 
   const openWhatsApp = (member, payment) => {
