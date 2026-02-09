@@ -19,7 +19,7 @@ const Footer = () => {
           </div>
 
           {/* Newsletter Subscription */}
-          <div className='flex flex-col gap-4'>
+          {/* <div className='flex flex-col gap-4'>
             <h2 className='text-2xl font-semibold'>Subscribe To Our Newsletter</h2>
             <input 
               type="email" 
@@ -31,7 +31,7 @@ const Footer = () => {
               className='px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md transition-all ease-in-out hover:bg-indigo-700 hover:scale-105'>
               Submit
             </button>
-          </div>
+          </div> */}
 
           {/* Social Media Links */}
           <div className='flex flex-col gap-4'>
@@ -43,7 +43,7 @@ const Footer = () => {
               <li>
                 <a href="#" className='text-lg text-gray-300 hover:text-indigo-500 transition-all'>Facebook</a>
               </li>
-              <li>
+              {/* <li>
                 <a href="#" className='text-lg text-gray-300 hover:text-indigo-500 transition-all'>Instagram</a>
               </li>
               <li>
@@ -51,12 +51,12 @@ const Footer = () => {
               </li>
               <li>
                 <a href="#" className='text-lg text-gray-300 hover:text-indigo-500 transition-all'>GitHub</a>
-              </li>
+              </li> */}
             </ul>
           </div>
 
           {/* Sponsor Logos */}
-          <div className='flex flex-col gap-4'>
+          {/* <div className='flex flex-col gap-4'>
             <h2 className='text-2xl font-semibold'>Our Sponsors</h2>
             <div className='flex flex-wrap gap-4'>
               <img src={sponsorImg1} alt="sponsor-img1" className='w-full max-w-[120px] object-contain' />
@@ -64,7 +64,7 @@ const Footer = () => {
               <img src={sponsorImg3} alt="sponsor-img3" className='w-full max-w-[120px] object-contain' />
               <img src={sponsorImg4} alt="sponsor-img4" className='w-full max-w-[120px] object-contain' />
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Footer Bottom */}

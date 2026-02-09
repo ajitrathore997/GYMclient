@@ -317,7 +317,7 @@ const AdminDashBoard = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
+        {/* <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
           <Link className='p-5 border border-white hover:bg-blue-600 transition-all' to={`/dashboard/admin/user-list`} data-aos="fade-up">
             <h2 className='text-white font-bold text-3xl'>Users: {userCount !== null ? userCount : "Loading..."}</h2>
           </Link>
@@ -335,7 +335,7 @@ const AdminDashBoard = () => {
               <h2 className='text-white font-bold text-3xl'>Feedbacks: {feedbackCount !== null ? feedbackCount : "Loading..."}</h2>
             </Link>
           )}
-        </div>
+        </div> */}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-10">
           <div className="bg-gray-800 p-5 border border-white" data-aos="fade-up">

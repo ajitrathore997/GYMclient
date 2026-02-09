@@ -9,6 +9,10 @@ const EditMember = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [currentCycle, setCurrentCycle] = useState(null);
+  const [totalOutstanding, setTotalOutstanding] = useState(0);
+  const [carryForward, setCarryForward] = useState(0);
+  const [adjustPayment, setAdjustPayment] = useState(false);
 
   const [member, setMember] = useState({
     name: "",
@@ -35,10 +39,12 @@ const EditMember = () => {
   const handleChange = (e) => {
     const { id, value } = e.target;
     const nextMember = { ...member, [id]: value };
-    if (id === "fee" || id === "paidAmount") {
+    if (id === "fee" || (id === "paidAmount" && adjustPayment)) {
       const fee = Number(id === "fee" ? value : nextMember.fee || 0);
       const paid = Number(id === "paidAmount" ? value : nextMember.paidAmount || 0);
-      nextMember.remainingAmount = Math.max(fee - paid, 0);
+      const cycleRemaining = Math.max(fee - paid, 0);
+      nextMember.remainingAmount = cycleRemaining;
+      setTotalOutstanding(Math.max(carryForward + cycleRemaining, 0));
       if (!(nextMember.paymentStatus === "Free Trial" && fee === 0)) {
         nextMember.paymentStatus = nextMember.remainingAmount === 0 ? "Paid" : "Pending";
       }
@@ -53,10 +59,17 @@ const EditMember = () => {
       const res = await axios.get(`${BASE_URL}/api/v1/members/${id}`);
       if (res.data?.success) {
         const m = res.data.member;
+        const cycle = res.data.currentCycle || null;
+        const totalOut = Number(res.data.totalOutstanding || 0);
+        const cycleRemaining = cycle ? Number(cycle.remainingAmount || 0) : 0;
         const fee = m.fee || 0;
-        const paidAmount = m.paidAmount || 0;
+        const paidAmount = cycle ? Number(cycle.paidAmount || 0) : (m.paidAmount || 0);
         const remainingAmount =
-          m.remainingAmount ?? Math.max(fee - paidAmount, 0);
+          cycle ? cycleRemaining : (m.remainingAmount ?? Math.max(fee - paidAmount, 0));
+        const carry = Math.max(totalOut - remainingAmount, 0);
+        setCurrentCycle(cycle);
+        setTotalOutstanding(totalOut);
+        setCarryForward(carry);
         setMember({
           name: m.name || "",
           email: m.email || "",
@@ -70,7 +83,7 @@ const EditMember = () => {
           membershipType: m.membershipType || "Basic",
           startDate: m.startDate ? new Date(m.startDate).toISOString().slice(0, 10) : "",
           duration: m.duration || "1 Month",
-          fee,
+          fee: cycle ? Number(cycle.fee || fee) : fee,
           paidAmount,
           remainingAmount,
           paymentStatus: m.paymentStatus || "Paid",
@@ -93,7 +106,13 @@ const EditMember = () => {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.put(`${BASE_URL}/api/v1/members/${id}`, member);
+      const payload = { ...member };
+      if (!adjustPayment) {
+        delete payload.paidAmount;
+        delete payload.remainingAmount;
+        delete payload.paymentStatus;
+      }
+      const res = await axios.put(`${BASE_URL}/api/v1/members/${id}`, payload);
       if (res.data?.success) {
         toast.success("Member updated");
         navigate("/dashboard/admin/members");
@@ -250,10 +269,21 @@ const EditMember = () => {
               onChange={handleChange}
               className="p-3 rounded-md outline-none w-full"
             />
+            <span className="text-xs text-gray-400 mt-1">
+              Changing fee applies to the next cycle, not the current one.
+            </span>
           </div>
 
           <div className="flex flex-col">
-            <label className="text-white font-bold mb-1">Paid Amount</label>
+            <label className="text-white font-bold mb-1">Paid Amount (Current Cycle)</label>
+            <label className="inline-flex items-center gap-2 text-xs text-gray-300 mb-2">
+              <input
+                type="checkbox"
+                checked={adjustPayment}
+                onChange={(e) => setAdjustPayment(e.target.checked)}
+              />
+              Adjust current cycle payment
+            </label>
             <input
               type="number"
               placeholder="Paid Amount"
@@ -261,15 +291,36 @@ const EditMember = () => {
               value={member.paidAmount}
               onChange={handleChange}
               className="p-3 rounded-md outline-none w-full"
+              readOnly={!adjustPayment}
             />
           </div>
 
           <div className="flex flex-col">
-            <label className="text-white font-bold mb-1">Remaining Amount</label>
+            <label className="text-white font-bold mb-1">Remaining Amount (Current Cycle)</label>
             <input
               type="number"
               id="remainingAmount"
               value={member.remainingAmount}
+              readOnly
+              className="p-3 rounded-md outline-none w-full bg-gray-200"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">Carry Forward Due</label>
+            <input
+              type="number"
+              value={carryForward}
+              readOnly
+              className="p-3 rounded-md outline-none w-full bg-gray-200"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">Total Outstanding</label>
+            <input
+              type="number"
+              value={totalOutstanding}
               readOnly
               className="p-3 rounded-md outline-none w-full bg-gray-200"
             />
