@@ -48,11 +48,20 @@ const Header = () => {
                 Exercises
               </Link>
             </li>
-            <li>
+            {/* <li>
               <Link to="/feedback" className="text-white hover:text-yellow-400 transition-all duration-300">
                 Feedback
               </Link>
-            </li>
+            </li> */}
+
+            {auth?.user?.name === "admin" && (
+              <li>
+                <Link to="/dashboard/admin/members" className="text-white hover:text-yellow-400 transition-all duration-300">
+                  Members
+                </Link>
+              </li>
+            )}
+
             {auth?.user?.name === "admin" && (
               <li>
                 <Link to="/dashboard/admin/create-plane" className="text-white hover:text-yellow-400 transition-all duration-300">
@@ -98,11 +107,20 @@ const Header = () => {
                 Exercises
               </Link>
             </li>
-            <li>
+            {/* <li>
               <Link to="/feedback" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
                 Feedback
               </Link>
-            </li>
+            </li> */}
+
+             {auth?.user?.name === "admin" && (
+              <li>
+                <Link to="/dashboard/admin/members" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
+                  Members
+                </Link>
+              </li>
+            )}
+
             {auth?.user?.name === "admin" && (
               <li>
                 <Link to="/dashboard/admin/create-plane" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>

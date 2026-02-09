@@ -30,11 +30,11 @@ const Register = () => {
       return;
     }
 
-    const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/;
-    if (!passwordPattern.test(password)) {
-      toast.error("Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number");
-      return;
-    }
+    // const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/;
+    // if (!passwordPattern.test(password)) {
+    //   toast.error("Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number");
+    //   return;
+    // }
 
     if (!/^[A-Za-z ]+$/.test(city)) {
       toast.error("City must contain only alphabets and spaces");

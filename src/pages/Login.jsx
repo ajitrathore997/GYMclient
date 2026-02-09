@@ -70,7 +70,7 @@ const Login = () => {
             name="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$" 
+            // pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$" 
             data-aos="zoom-in" // Add AOS animation
           />
 
