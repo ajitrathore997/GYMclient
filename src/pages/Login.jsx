@@ -74,13 +74,13 @@ const Login = () => {
             data-aos="zoom-in" // Add AOS animation
           />
 
-          <Link 
+          {/* <Link 
             to="/forgot-password" 
             className='text-white opacity-85 font-medium'
             data-aos="fade-in" // Add AOS animation
           >
             forgot password? <span className='underline text-blue-600 font-semibold'>Reset Password</span>
-          </Link>
+          </Link> */}
 
           <button 
             type='submit' 

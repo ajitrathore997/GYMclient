@@ -54,21 +54,21 @@ const Header = () => {
               </Link>
             </li> */}
 
-            {auth?.user?.name === "admin" && (
+            {auth?.user?.role === 1 && (
               <li>
                 <Link to="/dashboard/admin/members" className="text-white hover:text-yellow-400 transition-all duration-300">
                   Members
                 </Link>
               </li>
             )}
-            {auth?.user?.name === "admin" && (
+            {auth?.user?.role === 1 && (
               <li>
                 <Link to="/dashboard/admin/expenses" className="text-white hover:text-yellow-400 transition-all duration-300">
                   Expenses
                 </Link>
               </li>
             )}
-            {auth?.user?.name === "admin" && (
+            {auth?.user?.role === 1 && (
               <li>
                 <Link to="/dashboard/admin/inquiries" className="text-white hover:text-yellow-400 transition-all duration-300">
                   Inquiries
@@ -96,9 +96,9 @@ const Header = () => {
             </>
           ) : (
             <>
-              <Link to="/register" className="text-white hover:text-yellow-400 transition-all duration-300">
+              {/* <Link to="/register" className="text-white hover:text-yellow-400 transition-all duration-300">
                 Register
-              </Link>
+              </Link> */}
               <Link to="/login" className="text-white hover:text-yellow-400 transition-all duration-300">
                 Login
               </Link>
@@ -127,21 +127,21 @@ const Header = () => {
               </Link>
             </li> */}
 
-             {auth?.user?.name === "admin" && (
+             {auth?.user?.role === 1 && (
               <li>
                 <Link to="/dashboard/admin/members" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
                   Members
                 </Link>
               </li>
             )}
-            {auth?.user?.name === "admin" && (
+            {auth?.user?.role === 1 && (
               <li>
                 <Link to="/dashboard/admin/expenses" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
                   Expenses
                 </Link>
               </li>
             )}
-            {auth?.user?.name === "admin" && (
+            {auth?.user?.role === 1 && (
               <li>
                 <Link to="/dashboard/admin/inquiries" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
                   Inquiries

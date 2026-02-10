@@ -17,6 +17,8 @@ const MembersList = () => {
   const [editingHistoryIndex, setEditingHistoryIndex] = useState(null);
   const [editAmount, setEditAmount] = useState("");
   const [editNote, setEditNote] = useState("");
+  const [editingStatusIndex, setEditingStatusIndex] = useState(null);
+  const [editStatus, setEditStatus] = useState("Paid");
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [payMember, setPayMember] = useState(null);
   const [payAmount, setPayAmount] = useState("");
@@ -332,6 +334,16 @@ const MembersList = () => {
     setEditNote("");
   };
 
+  const startEditStatus = (index, status) => {
+    setEditingStatusIndex(index);
+    setEditStatus(status || "Paid");
+  };
+
+  const cancelEditStatus = () => {
+    setEditingStatusIndex(null);
+    setEditStatus("Paid");
+  };
+
   const saveEditHistory = async (index) => {
     if (!selectedMember?._id) return;
     try {
@@ -358,6 +370,50 @@ const MembersList = () => {
       toast.error(err.response?.data?.message || "Failed to update payment");
     }
   };
+
+  const saveEditStatus = async (index) => {
+    if (!selectedMember?._id) return;
+    try {
+      const payload = { paymentStatus: editStatus };
+      const res = await axios.put(
+        `${BASE_URL}/api/v1/members/${selectedMember._id}/payment-history/${index}/status`,
+        payload
+      );
+      if (res.data?.success) {
+        toast.success("Status updated");
+        setSelectedMember(res.data.member);
+        setMembers((prev) =>
+          prev.map((m) => (m._id === res.data.member._id ? res.data.member : m))
+        );
+        cancelEditStatus();
+      } else {
+        toast.error(res.data?.message || "Failed to update status");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update status");
+    }
+  };
+
+  // const deletePaymentHistory = async (index) => {
+  //   if (!selectedMember?._id) return;
+  //   if (!window.confirm("Delete this payment entry?")) return;
+  //   try {
+  //     const res = await axios.delete(
+  //       `${BASE_URL}/api/v1/members/${selectedMember._id}/payment-history/${index}`
+  //     );
+  //     if (res.data?.success) {
+  //       toast.success("Payment deleted");
+  //       setSelectedMember(res.data.member);
+  //       setMembers((prev) =>
+  //         prev.map((m) => (m._id === res.data.member._id ? res.data.member : m))
+  //       );
+  //     } else {
+  //       toast.error(res.data?.message || "Failed to delete payment");
+  //     }
+  //   } catch (err) {
+  //     toast.error(err.response?.data?.message || "Failed to delete payment");
+  //   }
+  // };
 
   const submitPayment = async (e) => {
     e.preventDefault();
@@ -743,7 +799,21 @@ const MembersList = () => {
                         <td className="px-3 py-2">{formatAllocationRanges(p.allocations)}</td>
                         <td className="px-3 py-2">{formatDateTime(p.at)}</td>
                         <td className="px-3 py-2">{p.by?.name || "Unknown"}</td>
-                        <td className="px-3 py-2">{p.paymentStatus || "-"}</td>
+                        <td className="px-3 py-2">
+                          {editingStatusIndex === idx ? (
+                            <select
+                              value={editStatus}
+                              onChange={(e) => setEditStatus(e.target.value)}
+                              className="p-1 rounded bg-gray-800 border border-gray-700"
+                            >
+                              <option>Paid</option>
+                              <option>Pending</option>
+                              <option>Free Trial</option>
+                            </select>
+                          ) : (
+                            p.paymentStatus || "-"
+                          )}
+                        </td>
                         <td className="px-3 py-2">
                           {editingHistoryIndex === idx ? (
                             <input
@@ -783,6 +853,35 @@ const MembersList = () => {
                                   >
                                     Edit
                                   </button>
+                                  {editingStatusIndex === idx ? (
+                                    <>
+                                      <button
+                                        onClick={() => saveEditStatus(idx)}
+                                        className="px-2 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                                      >
+                                        Save Status
+                                      </button>
+                                      <button
+                                        onClick={cancelEditStatus}
+                                        className="px-2 py-1 rounded bg-gray-700 text-white hover:bg-gray-600 transition-all"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      onClick={() => startEditStatus(idx, p.paymentStatus)}
+                                      className="px-2 py-1 rounded bg-purple-600 text-white hover:bg-purple-500 transition-all"
+                                    >
+                                      Status
+                                    </button>
+                                  )}
+                                  {/* <button
+                                    onClick={() => deletePaymentHistory(idx)}
+                                    className="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-500 transition-all"
+                                  >
+                                    Delete
+                                  </button> */}
                                   <button
                                     onClick={() => buildPayslip(selectedMember, p)}
                                     className="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500 transition-all"
