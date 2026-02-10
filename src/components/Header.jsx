@@ -21,7 +21,7 @@ const Header = () => {
         {/* Logo (Stylized Text) */}
         <Link to="/" className="flex items-center space-x-2">
           <span className="text-3xl sm:text-4xl font-extrabold text-yellow-400 tracking-widest">
-            Gym<span className="text-white">Master</span>
+            SR<span className="text-white">Fitness</span>
           </span>
         </Link>
 
