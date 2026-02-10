@@ -13,6 +13,7 @@ const EditMember = () => {
   const [totalOutstanding, setTotalOutstanding] = useState(0);
   const [carryForward, setCarryForward] = useState(0);
   const [adjustPayment, setAdjustPayment] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const [member, setMember] = useState({
     name: "",
@@ -126,6 +127,29 @@ const EditMember = () => {
     }
   };
 
+  const handleProfileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("profilePic", file);
+    try {
+      setUploading(true);
+      const res = await axios.post(`${BASE_URL}/api/v1/members/upload`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (res.data?.success) {
+        setMember((prev) => ({ ...prev, profilePic: res.data.url }));
+        toast.success("Profile picture uploaded");
+      } else {
+        toast.error(res.data?.message || "Upload failed");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   useEffect(() => {
     fetchMember();
   }, [id]);
@@ -232,6 +256,24 @@ const EditMember = () => {
             onChange={handleChange}
             className="p-3 rounded-md outline-none w-full"
           />
+
+          <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">Profile Picture</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleProfileUpload}
+              className="p-2 rounded-md outline-none w-full bg-white"
+            />
+            {uploading && <span className="text-xs text-gray-300 mt-1">Uploading...</span>}
+            {member.profilePic && (
+              <img
+                src={member.profilePic}
+                alt="Profile"
+                className="mt-2 w-24 h-24 object-cover rounded"
+              />
+            )}
+          </div>
 
           <div className="flex flex-col">
             <label className="text-white font-bold mb-1">Membership Start Date</label>

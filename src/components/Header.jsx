@@ -43,11 +43,11 @@ const Header = () => {
                 Home
               </Link>
             </li>
-            <li>
+            {/* <li>
               <Link to="/exercise" className="text-white hover:text-yellow-400 transition-all duration-300">
                 Exercises
               </Link>
-            </li>
+            </li> */}
             {/* <li>
               <Link to="/feedback" className="text-white hover:text-yellow-400 transition-all duration-300">
                 Feedback
@@ -61,14 +61,28 @@ const Header = () => {
                 </Link>
               </li>
             )}
-
             {auth?.user?.name === "admin" && (
+              <li>
+                <Link to="/dashboard/admin/expenses" className="text-white hover:text-yellow-400 transition-all duration-300">
+                  Expenses
+                </Link>
+              </li>
+            )}
+            {auth?.user?.name === "admin" && (
+              <li>
+                <Link to="/dashboard/admin/inquiries" className="text-white hover:text-yellow-400 transition-all duration-300">
+                  Inquiries
+                </Link>
+              </li>
+            )}
+
+            {/* {auth?.user?.name === "admin" && (
               <li>
                 <Link to="/dashboard/admin/create-plane" className="text-white hover:text-yellow-400 transition-all duration-300">
                   Create Plan
                 </Link>
               </li>
-            )}
+            )} */}
           </ul>
 
           {auth?.user ? (
@@ -102,11 +116,11 @@ const Header = () => {
                 Home
               </Link>
             </li>
-            <li>
+            {/* <li>
               <Link to="/exercise" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
                 Exercises
               </Link>
-            </li>
+            </li> */}
             {/* <li>
               <Link to="/feedback" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
                 Feedback
@@ -120,14 +134,28 @@ const Header = () => {
                 </Link>
               </li>
             )}
-
             {auth?.user?.name === "admin" && (
+              <li>
+                <Link to="/dashboard/admin/expenses" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
+                  Expenses
+                </Link>
+              </li>
+            )}
+            {auth?.user?.name === "admin" && (
+              <li>
+                <Link to="/dashboard/admin/inquiries" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
+                  Inquiries
+                </Link>
+              </li>
+            )}
+
+            {/* {auth?.user?.name === "admin" && (
               <li>
                 <Link to="/dashboard/admin/create-plane" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
                   Create Plan
                 </Link>
               </li>
-            )}
+            )} */}
             {auth?.user ? (
               <>
                 <Link to={auth.user.name === "admin" ? "/dashboard/admin" : "/dashboard/user"} className="text-white font-semibold hover:text-yellow-400 transition-all duration-300 capitalize" onClick={() => setMobileMenuOpen(false)}>

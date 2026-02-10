@@ -163,6 +163,7 @@ import { toast } from "react-hot-toast";
 import { BASE_URL } from "../../utils/fetchData";
 import AOS from 'aos';
 import 'aos/dist/aos.css'; // Import AOS styles
+import { BarChart } from "@mui/x-charts/BarChart";
 
 const AdminDashBoard = () => {
   const [userCount, setUserCount] = useState(null);
@@ -173,9 +174,16 @@ const AdminDashBoard = () => {
   const [loading, setLoading] = useState(false);
   const [memberStats, setMemberStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [range, setRange] = useState({ startDate: "", endDate: "" });
 
   // AOS Initialization
   useEffect(() => {
+    const today = new Date();
+    const end = today.toISOString().slice(0, 10);
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - 30);
+    const start = startDate.toISOString().slice(0, 10);
+    setRange({ startDate: start, endDate: end });
     AOS.init({
       duration: 1000, // Animation duration in milliseconds
       easing: 'ease-in-out', // Animation easing
@@ -189,7 +197,7 @@ const AdminDashBoard = () => {
     getSubscriptions();
     getContacts();
     getFeedbacks();
-    getMemberStats();
+    getMemberStats(start, end);
   }, []);
 
   const getUsers = async () => {
@@ -267,10 +275,13 @@ const AdminDashBoard = () => {
     }
   }
 
-  const getMemberStats = async () => {
+  const getMemberStats = async (startDate, endDate) => {
     try {
       setStatsLoading(true);
-      const res = await axios.get(`${BASE_URL}/api/v1/members/dashboard`);
+      const params = {};
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
+      const res = await axios.get(`${BASE_URL}/api/v1/members/dashboard`, { params });
       if (res.data && res.data.success) {
         setMemberStats(res.data.stats);
       }
@@ -290,11 +301,49 @@ const AdminDashBoard = () => {
     <section className='pt-10 bg-gray-900'>
       <Heading name="Admin Dashboard" />
       <div className="container mx-auto px-6 py-20">
+        <div className="bg-gray-800 p-4 border border-white mb-8">
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="flex flex-col">
+              <label className="text-gray-300 text-sm mb-1">Start Date</label>
+              <input
+                type="date"
+                value={range.startDate}
+                onChange={(e) =>
+                  setRange((prev) => ({ ...prev, startDate: e.target.value }))
+                }
+                className="p-2 rounded-md outline-none"
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="text-gray-300 text-sm mb-1">End Date</label>
+              <input
+                type="date"
+                value={range.endDate}
+                onChange={(e) =>
+                  setRange((prev) => ({ ...prev, endDate: e.target.value }))
+                }
+                className="p-2 rounded-md outline-none"
+              />
+            </div>
+            <button
+              onClick={() => getMemberStats(range.startDate, range.endDate)}
+              className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-all"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
           <div className="p-5 border border-white bg-gray-800" data-aos="fade-up">
             <p className="text-gray-300 text-sm">Total Members</p>
             <h3 className="text-white font-bold text-3xl">
               {memberStats ? memberStats.totalMembers : "Loading..."}
+            </h3>
+          </div>
+          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="50">
+            <p className="text-gray-300 text-sm">Members Joined (Range)</p>
+            <h3 className="text-white font-bold text-3xl">
+              {memberStats ? memberStats.membersJoinedInRange : "Loading..."}
             </h3>
           </div>
           <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="100">
@@ -310,9 +359,42 @@ const AdminDashBoard = () => {
             </h3>
           </div>
           <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="300">
+            <p className="text-gray-300 text-sm">Paid In Range</p>
+            <h3 className="text-white font-bold text-3xl">
+              {memberStats ? memberStats.paidInRange : "Loading..."}
+            </h3>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
+          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up">
+            <p className="text-gray-300 text-sm">Payments In Range</p>
+            <h3 className="text-white font-bold text-3xl">
+              {memberStats ? memberStats.paymentsCountInRange : "Loading..."}
+            </h3>
+          </div>
+          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="100">
             <p className="text-gray-300 text-sm">Total Remaining</p>
             <h3 className="text-white font-bold text-3xl">
               {memberStats ? memberStats.totalRemaining : "Loading..."}
+            </h3>
+          </div>
+          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="200">
+            <p className="text-gray-300 text-sm">Total Fee</p>
+            <h3 className="text-white font-bold text-3xl">
+              {memberStats ? memberStats.totalFee : "Loading..."}
+            </h3>
+          </div>
+          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="300">
+            <p className="text-gray-300 text-sm">Expenses In Range</p>
+            <h3 className="text-white font-bold text-3xl">
+              {memberStats ? memberStats.expensesInRange : "Loading..."}
+            </h3>
+          </div>
+          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="400">
+            <p className="text-gray-300 text-sm">Income (Paid - Expense)</p>
+            <h3 className="text-white font-bold text-3xl">
+              {memberStats ? memberStats.netInRange : "Loading..."}
             </h3>
           </div>
         </div>
@@ -385,6 +467,104 @@ const AdminDashBoard = () => {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="bg-gray-800 p-5 border border-white mt-10" data-aos="fade-up">
+          <h3 className="text-white text-xl font-semibold mb-4">Payments (Range)</h3>
+          {statsLoading && <p className="text-gray-300">Loading...</p>}
+          {!statsLoading && memberStats && (
+  <div className="bg-gray-900 p-4 rounded">
+    <BarChart
+      height={320}
+      series={[
+        {
+          data: (memberStats.paymentSeries || []).map((p) => p.total),
+          label: "Payments",
+        },
+      ]}
+      
+      xAxis={[
+        {
+          data: (memberStats.paymentSeries || []).map((p) =>
+            new Date(p.date).toLocaleDateString()
+          ),
+          scaleType: "band",
+          tickLabelStyle: {
+            fill: "#9CA3AF", // subtle gray (dates)
+          },
+        },
+      ]}
+      yAxis={[
+        {
+          tickLabelStyle: {
+            fill: "#9CA3AF", // subtle gray (values)
+          },
+        },
+      ]}
+      colors={["#22c55e"]}
+      sx={{
+        "& .MuiChartsAxis-line": {
+          stroke: "#4B5563",
+        },
+        "& .MuiChartsAxis-tick": {
+          stroke: "#4B5563",
+        },
+        "& .MuiChartsLegend-label": {
+          fill: "#D1D5DB",
+        },
+      }}
+    />
+  </div>
+)}
+
+        </div>
+
+        <div className="bg-gray-800 p-5 border border-white mt-10" data-aos="fade-up">
+          <h3 className="text-white text-xl font-semibold mb-4">Expenses (Range)</h3>
+          {statsLoading && <p className="text-gray-300">Loading...</p>}
+          {!statsLoading && memberStats && (
+            <div className="bg-gray-900 p-4 rounded">
+              <BarChart
+                height={320}
+                series={[
+                  {
+                    data: (memberStats.expenseSeries || []).map((p) => p.total),
+                    label: "Expenses",
+                  },
+                ]}
+                xAxis={[
+                  {
+                    data: (memberStats.expenseSeries || []).map((p) =>
+                      new Date(p.date).toLocaleDateString()
+                    ),
+                    scaleType: "band",
+                    tickLabelStyle: {
+                      fill: "#9CA3AF",
+                    },
+                  },
+                ]}
+                yAxis={[
+                  {
+                    tickLabelStyle: {
+                      fill: "#9CA3AF",
+                    },
+                  },
+                ]}
+                colors={["#f97316"]}
+                sx={{
+                  "& .MuiChartsAxis-line": {
+                    stroke: "#4B5563",
+                  },
+                  "& .MuiChartsAxis-tick": {
+                    stroke: "#4B5563",
+                  },
+                  "& .MuiChartsLegend-label": {
+                    fill: "#D1D5DB",
+                  },
+                }}
+              />
+            </div>
+          )}
         </div>
 
         <div className="bg-gray-800 p-5 border border-white mt-10" data-aos="fade-up">

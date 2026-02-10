@@ -27,5 +27,7 @@ import FeedbackList from "./Admin/FeedbackList";
 import AddMember  from "./Admin/Member";
 import MembersList from "./Admin/MembersList";
 import EditMember from "./Admin/EditMember";
+import Expenses from "./Admin/Expenses";
+import Inquiries from "./Admin/Inquiries";
 // import PlanFullDetail from "./User/PlanFullDetail";
-export {AddMember, MembersList, EditMember, Home, Register, Login, ForgotPassword, PlanSubscription, Error, About, Exercise, ExerciseDetail, PlanDetail, Profile, UserDashBoard, FavouriteExercises, AdminDashBoard, SubscriberList, CreatePlan, Plans, UpdatePlan, UserList, PlanDetails, PlanFullDetail, ContactUs, TrainerDetails, Feedback, Feedbacks, FeedbackList };
+export {AddMember, MembersList, EditMember, Expenses, Inquiries, Home, Register, Login, ForgotPassword, PlanSubscription, Error, About, Exercise, ExerciseDetail, PlanDetail, Profile, UserDashBoard, FavouriteExercises, AdminDashBoard, SubscriberList, CreatePlan, Plans, UpdatePlan, UserList, PlanDetails, PlanFullDetail, ContactUs, TrainerDetails, Feedback, Feedbacks, FeedbackList };

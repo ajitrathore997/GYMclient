@@ -21,6 +21,7 @@ const MembersList = () => {
   const [payMember, setPayMember] = useState(null);
   const [payAmount, setPayAmount] = useState("");
   const [payNote, setPayNote] = useState("");
+  const [payDate, setPayDate] = useState("");
 
   const [filters, setFilters] = useState({
     search: "",
@@ -129,6 +130,8 @@ const MembersList = () => {
     setPayMember(member);
     setPayAmount("");
     setPayNote("");
+    const today = new Date().toISOString().slice(0, 10);
+    setPayDate(today);
     setIsPayOpen(true);
   };
 
@@ -137,6 +140,7 @@ const MembersList = () => {
     setPayMember(null);
     setPayAmount("");
     setPayNote("");
+    setPayDate("");
   };
 
   const formatDateTime = (value) => {
@@ -359,7 +363,11 @@ const MembersList = () => {
     e.preventDefault();
     if (!payMember?._id) return;
     try {
-      const payload = { amount: Number(payAmount || 0), note: payNote };
+      const payload = {
+        amount: Number(payAmount || 0),
+        note: payNote,
+        date: payDate,
+      };
       const res = await axios.post(
         `${BASE_URL}/api/v1/members/${payMember._id}/pay`,
         payload
@@ -545,6 +553,7 @@ const MembersList = () => {
             <table className="min-w-full text-left text-sm text-gray-200">
               <thead className="bg-gray-700 text-gray-100">
                 <tr>
+                  <th className="px-4 py-3">Photo</th>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Phone</th>
                   <th className="px-4 py-3">Email</th>
@@ -562,7 +571,7 @@ const MembersList = () => {
               <tbody>
                 {members.length === 0 && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-gray-300" colSpan={12}>
+                    <td className="px-4 py-6 text-center text-gray-300" colSpan={13}>
                       No members found
                     </td>
                   </tr>
@@ -584,6 +593,19 @@ const MembersList = () => {
                       : "-";
                     return (
                   <tr key={m._id} className="border-b border-gray-700">
+                    <td className="px-4 py-3">
+                      {m.profilePic ? (
+                        <img
+                          src={m.profilePic}
+                          alt={m.name}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-xs text-gray-300">
+                          N/A
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3">{m.name}</td>
                     <td className="px-4 py-3">{m.phone}</td>
                     <td className="px-4 py-3">{m.email || "-"}</td>
@@ -809,6 +831,16 @@ const MembersList = () => {
                   type="number"
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}
+                  className="p-2 rounded bg-gray-800 border border-gray-700"
+                  required
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-sm text-gray-300 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={payDate}
+                  onChange={(e) => setPayDate(e.target.value)}
                   className="p-2 rounded bg-gray-800 border border-gray-700"
                   required
                 />

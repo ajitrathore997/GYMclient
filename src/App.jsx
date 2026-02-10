@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Header, Footer, ScrollButton, PrivateRoute, AdminRoute, Modal } from "./components";
-import {AddMember, MembersList, EditMember, Register , Login, ForgotPassword, Home, PlanSubscription, Error, Exercise, ExerciseDetail, Profile, UserDashBoard, PlanDetail, AdminDashBoard, CreatePlan, UpdatePlan, Plans, SubscriberList, UserList, FavouriteExercises, PlanDetails, PlanFullDetail, ContactUs, TrainerDetails, Feedback, Feedbacks, FeedbackList} from "./pages";
+import {AddMember, MembersList, EditMember, Expenses, Inquiries, Register , Login, ForgotPassword, Home, PlanSubscription, Error, Exercise, ExerciseDetail, Profile, UserDashBoard, PlanDetail, AdminDashBoard, CreatePlan, UpdatePlan, Plans, SubscriberList, UserList, FavouriteExercises, PlanDetails, PlanFullDetail, ContactUs, TrainerDetails, Feedback, Feedbacks, FeedbackList} from "./pages";
 // import PlanFullDetail from './pages/User/planFullDetail';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from "./context/auth";
@@ -57,6 +57,8 @@ const App = () => {
           <Route path='admin/add-member' element={<AddMember />} />
           <Route path='admin/members' element={<MembersList />} />
           <Route path='admin/members/:id' element={<EditMember />} />
+          <Route path='admin/expenses' element={<Expenses />} />
+          <Route path='admin/inquiries' element={<Inquiries />} />
          
         </Route>
 
