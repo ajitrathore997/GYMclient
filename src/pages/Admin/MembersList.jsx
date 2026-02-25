@@ -684,7 +684,8 @@ const MembersList = () => {
               <option value="fee">Fee</option>
               <option value="paidAmount">Paid</option>
               <option value="remainingAmount">Remaining</option>
-              <option value="startDate">Start Date</option>
+              <option value="activationDate">Activation Date</option>
+              <option value="registrationDate">Registration Date</option>
             </select>
             <select
               id="sortOrder"
@@ -730,7 +731,8 @@ const MembersList = () => {
                   <th className="px-4 py-3">Remaining</th>
                   <th className="px-4 py-3">Payment</th>
                   <th className="px-4 py-3">Member</th>
-                  <th className="px-4 py-3">Start</th>
+                  <th className="px-4 py-3">Registration</th>
+                  <th className="px-4 py-3">Activation</th>
                   <th className="px-4 py-3">Expiry</th>
                   <th className="px-4 py-3">Last Month</th>
                   <th className="px-4 py-3">Last Payment</th>
@@ -740,7 +742,7 @@ const MembersList = () => {
               <tbody>
                 {members.length === 0 && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-gray-300" colSpan={14}>
+                    <td className="px-4 py-6 text-center text-gray-300" colSpan={16}>
                       No members found
                     </td>
                   </tr>
@@ -787,7 +789,12 @@ const MembersList = () => {
                     <td className="px-4 py-3">{m.displayPaymentStatus || m.paymentStatus}</td>
                     <td className="px-4 py-3">{m.memberStatus || "Active"}</td>
                     <td className="px-4 py-3">
-                      {m.startDate ? new Date(m.startDate).toLocaleDateString() : "-"}
+                      {m.registrationDate ? new Date(m.registrationDate).toLocaleDateString() : "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {(m.activationDate || m.startDate)
+                        ? new Date(m.activationDate || m.startDate).toLocaleDateString()
+                        : "-"}
                     </td>
                     <td className="px-4 py-3">{expiryLabel}</td>
                     <td className="px-4 py-3">{m.lastPaymentMonth || "-"}</td>

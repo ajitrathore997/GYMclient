@@ -28,6 +28,8 @@ const EditMember = () => {
     emergencyPhone: "",
     healthNotes: "",
     membershipType: "Basic",
+    registrationDate: "",
+    activationDate: "",
     startDate: "",
     duration: "1 Month",
     fee: 0,
@@ -53,6 +55,12 @@ const EditMember = () => {
       if (!(nextMember.paymentStatus === "Free Trial" && fee === 0)) {
         nextMember.paymentStatus = nextMember.remainingAmount === 0 ? "Paid" : "Pending";
       }
+    }
+    if (id === "activationDate") {
+      nextMember.startDate = value;
+    }
+    if (id === "startDate") {
+      nextMember.activationDate = value;
     }
     setMember(nextMember);
   };
@@ -86,6 +94,12 @@ const EditMember = () => {
           emergencyPhone: m.emergencyPhone || "",
           healthNotes: m.healthNotes || "",
           membershipType: m.membershipType || "Basic",
+          registrationDate: m.registrationDate
+            ? new Date(m.registrationDate).toISOString().slice(0, 10)
+            : (m.createdAt ? new Date(m.createdAt).toISOString().slice(0, 10) : ""),
+          activationDate: m.activationDate
+            ? new Date(m.activationDate).toISOString().slice(0, 10)
+            : (m.startDate ? new Date(m.startDate).toISOString().slice(0, 10) : ""),
           startDate: m.startDate ? new Date(m.startDate).toISOString().slice(0, 10) : "",
           duration: m.duration || "1 Month",
           fee: cycle ? Number(cycle.fee || fee) : fee,
@@ -131,6 +145,7 @@ const EditMember = () => {
         delete payload.remainingAmount;
         delete payload.paymentStatus;
       }
+      payload.startDate = payload.activationDate || payload.startDate;
       delete payload.memberStatus;
       const res = await axios.put(`${BASE_URL}/api/v1/members/${id}`, payload);
       if (res.data?.success) {
@@ -336,11 +351,22 @@ const EditMember = () => {
           </div>
 
           <div className="flex flex-col">
-            <label className="text-white font-bold mb-1">Membership Start Date</label>
+            <label className="text-white font-bold mb-1">Registration Date</label>
             <input
               type="date"
-              id="startDate"
-              value={member.startDate}
+              id="registrationDate"
+              value={member.registrationDate}
+              onChange={handleChange}
+              className="p-3 rounded-md outline-none w-full"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">Activation Date</label>
+            <input
+              type="date"
+              id="activationDate"
+              value={member.activationDate}
               onChange={handleChange}
               className="p-3 rounded-md outline-none w-full"
             />

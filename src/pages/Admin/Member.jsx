@@ -8,6 +8,7 @@ import { BASE_URL } from "../../utils/fetchData";
 const AddMember = () => {
   const navigate = useNavigate();
   const { auth } = useAuth();
+  const today = new Date().toISOString().slice(0, 10);
 
   // Member state
   const [member, setMember] = useState({
@@ -21,7 +22,9 @@ const AddMember = () => {
     emergencyPhone: "",
     healthNotes: "",
     membershipType: "Basic",
-    startDate: "",
+    registrationDate: today,
+    activationDate: today,
+    startDate: today,
     duration: "1 Month",
     fee: 0,
     paidAmount: 0,
@@ -52,6 +55,12 @@ const AddMember = () => {
       if (!(nextMember.paymentStatus === "Free Trial" && fee === 0)) {
         nextMember.paymentStatus = nextMember.remainingAmount === 0 ? "Paid" : "Pending";
       }
+    }
+    if (id === "activationDate") {
+      nextMember.startDate = value;
+    }
+    if (id === "startDate") {
+      nextMember.activationDate = value;
     }
     setMember(nextMember);
   };
@@ -88,7 +97,12 @@ const AddMember = () => {
     }
 
     try {
-      const res = await axios.post(`${BASE_URL}/api/v1/members`, member);
+      const payload = {
+        ...member,
+        activationDate: member.activationDate || member.startDate,
+        startDate: member.activationDate || member.startDate,
+      };
+      const res = await axios.post(`${BASE_URL}/api/v1/members`, payload);
       if (res.data.success) {
         toast.success("Member added successfully!");
         navigate("/dashboard/admin/members");
@@ -219,13 +233,23 @@ const AddMember = () => {
             )}
           </div>
 
-          {/* Membership Start Date */}
           <div className="flex flex-col">
-            <label className="text-white font-bold mb-1">Membership Start Date</label>
+            <label className="text-white font-bold mb-1">Registration Date</label>
             <input
               type="date"
-              id="startDate"
-              value={member.startDate}
+              id="registrationDate"
+              value={member.registrationDate}
+              onChange={handleChange}
+              className="p-3 rounded-md outline-none w-full"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">Activation Date</label>
+            <input
+              type="date"
+              id="activationDate"
+              value={member.activationDate}
               onChange={handleChange}
               className="p-3 rounded-md outline-none w-full"
             />
