@@ -24,10 +24,16 @@ const MembersList = () => {
   const [payAmount, setPayAmount] = useState("");
   const [payNote, setPayNote] = useState("");
   const [payDate, setPayDate] = useState("");
+  const [payMonth, setPayMonth] = useState("");
+  const [payMode, setPayMode] = useState("Cash");
+  const [promiseDate, setPromiseDate] = useState("");
+  const [listType, setListType] = useState("all");
 
   const [filters, setFilters] = useState({
     search: "",
     paymentStatus: "",
+    memberStatus: "",
+    reminderStatus: "",
     membershipType: "",
     personalTrainer: "",
     minRemaining: "",
@@ -48,6 +54,7 @@ const MembersList = () => {
     try {
       const params = {
         ...filters,
+        listType,
         page,
         limit,
       };
@@ -82,11 +89,26 @@ const MembersList = () => {
 
   useEffect(() => {
     fetchMembers();
-  }, [filters, page, limit]);
+  }, [filters, listType, page, limit]);
 
   const totalPages = useMemo(() => {
     return Math.max(Math.ceil(total / limit), 1);
   }, [total, limit]);
+
+  const paymentMonthOptions = useMemo(() => {
+    const now = new Date();
+    const options = [];
+    for (let i = -3; i <= 8; i += 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      options.push(
+        d.toLocaleString(undefined, {
+          month: "long",
+          year: "numeric",
+        })
+      );
+    }
+    return options;
+  }, []);
 
   const handleFilterChange = (e) => {
     const { id, value } = e.target;
@@ -98,6 +120,8 @@ const MembersList = () => {
     setFilters({
       search: "",
       paymentStatus: "",
+      memberStatus: "",
+      reminderStatus: "",
       membershipType: "",
       personalTrainer: "",
       minRemaining: "",
@@ -134,6 +158,9 @@ const MembersList = () => {
     setPayNote("");
     const today = new Date().toISOString().slice(0, 10);
     setPayDate(today);
+    setPayMonth(new Date().toLocaleString(undefined, { month: "long", year: "numeric" }));
+    setPayMode("Cash");
+    setPromiseDate("");
     setIsPayOpen(true);
   };
 
@@ -143,6 +170,9 @@ const MembersList = () => {
     setPayAmount("");
     setPayNote("");
     setPayDate("");
+    setPayMonth("");
+    setPayMode("Cash");
+    setPromiseDate("");
   };
 
   const formatDateTime = (value) => {
@@ -206,7 +236,7 @@ const MembersList = () => {
   y += 10;
 
   // ===== Data preparation =====
-  const cycleLabel = formatAllocationRanges(payment.allocations);
+  const cycleLabel = payment.paymentMonth || formatAllocationRanges(payment.allocations);
   const paymentDate = formatDateTime(payment.at);
   const receivedBy = payment.by?.name || "Unknown";
 
@@ -251,7 +281,7 @@ const MembersList = () => {
 
   doc.setFont("helvetica", "normal");
   labelValue("Cycle Period:", cycleLabel);
-  // labelValue("Amount Paid:", `₹${payment.amount ?? 0}`);
+  labelValue("Payment Mode:", payment.paymentMode || "-");
   labelValue("Amount Paid:", `Rs.${payment.amount ?? 0}`);
   labelValue("Payment Date:", paymentDate);
   labelValue("Received By:", receivedBy);
@@ -304,7 +334,7 @@ const MembersList = () => {
       toast.error("Member phone number not available");
       return;
     }
-    const cycleLabel = formatAllocationRanges(payment.allocations);
+    const cycleLabel = payment.paymentMonth || formatAllocationRanges(payment.allocations);
     const paymentDate = formatDateTime(payment.at);
     const receivedBy = payment.by?.name || "Unknown";
     const totalOutstanding = Number(member.remainingAmount || 0);
@@ -418,11 +448,27 @@ const MembersList = () => {
   const submitPayment = async (e) => {
     e.preventDefault();
     if (!payMember?._id) return;
+    const dueAmount = Number(
+      payMember.dueNowAmount ?? payMember.remainingAmount ?? 0
+    );
+    const enteredAmount = Number(payAmount || 0);
+    const needsPromiseDate = enteredAmount > 0 && enteredAmount < dueAmount;
+    if (needsPromiseDate && !promiseDate) {
+      toast.error("Please select when remaining amount will be paid");
+      return;
+    }
+    if (needsPromiseDate && payDate && promiseDate && new Date(promiseDate) < new Date(payDate)) {
+      toast.error("Promise date cannot be earlier than payment date");
+      return;
+    }
     try {
       const payload = {
-        amount: Number(payAmount || 0),
+        amount: enteredAmount,
         note: payNote,
         date: payDate,
+        paymentMonth: payMonth,
+        paymentMode: payMode,
+        promiseDate: needsPromiseDate ? promiseDate : undefined,
       };
       const res = await axios.post(
         `${BASE_URL}/api/v1/members/${payMember._id}/pay`,
@@ -430,15 +476,30 @@ const MembersList = () => {
       );
       if (res.data?.success) {
         toast.success("Payment added");
-        setMembers((prev) =>
-          prev.map((m) => (m._id === res.data.member._id ? res.data.member : m))
-        );
+        fetchMembers();
         closePay();
       } else {
         toast.error(res.data?.message || "Failed to add payment");
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to add payment");
+    }
+  };
+
+  const updateMemberStatus = async (member, nextStatus) => {
+    if (!member?._id) return;
+    try {
+      const res = await axios.put(`${BASE_URL}/api/v1/members/${member._id}/status`, {
+        memberStatus: nextStatus,
+      });
+      if (res.data?.success) {
+        toast.success(res.data.message || "Member status updated");
+        fetchMembers();
+      } else {
+        toast.error(res.data?.message || "Failed to update member status");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update member status");
     }
   };
 
@@ -453,6 +514,36 @@ const MembersList = () => {
           >
             Add Member
           </Link>
+        </div>
+
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => {
+              setPage(1);
+              setListType("all");
+            }}
+            className={`px-3 py-2 rounded-md text-sm transition-all ${listType === "all" ? "bg-blue-600 text-white" : "bg-gray-700 text-gray-200 hover:bg-gray-600"}`}
+          >
+            All Members
+          </button>
+          <button
+            onClick={() => {
+              setPage(1);
+              setListType("active");
+            }}
+            className={`px-3 py-2 rounded-md text-sm transition-all ${listType === "active" ? "bg-green-600 text-white" : "bg-gray-700 text-gray-200 hover:bg-gray-600"}`}
+          >
+            Active Members
+          </button>
+          <button
+            onClick={() => {
+              setPage(1);
+              setListType("reminder");
+            }}
+            className={`px-3 py-2 rounded-md text-sm transition-all ${listType === "reminder" ? "bg-yellow-500 text-black" : "bg-gray-700 text-gray-200 hover:bg-gray-600"}`}
+          >
+            Payment Reminders
+          </button>
         </div>
 
         <div className="bg-gray-800 p-4 rounded-md mb-6">
@@ -475,6 +566,26 @@ const MembersList = () => {
               <option value="Paid">Paid</option>
               <option value="Pending">Pending</option>
               <option value="Free Trial">Free Trial</option>
+            </select>
+            <select
+              id="memberStatus"
+              value={filters.memberStatus}
+              onChange={handleFilterChange}
+              className="p-2 rounded-md outline-none w-full"
+            >
+              <option value="">Member Status (All)</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+            <select
+              id="reminderStatus"
+              value={filters.reminderStatus}
+              onChange={handleFilterChange}
+              className="p-2 rounded-md outline-none w-full"
+            >
+              <option value="">Reminder (All)</option>
+              <option value="None">None</option>
+              <option value="Promised">Promised to Pay</option>
             </select>
             <select
               id="membershipType"
@@ -617,9 +728,11 @@ const MembersList = () => {
                   <th className="px-4 py-3">Fee</th>
                   <th className="px-4 py-3">Paid</th>
                   <th className="px-4 py-3">Remaining</th>
-                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Payment</th>
+                  <th className="px-4 py-3">Member</th>
                   <th className="px-4 py-3">Start</th>
-                  <th className="px-4 py-3">Cycle</th>
+                  <th className="px-4 py-3">Expiry</th>
+                  <th className="px-4 py-3">Last Month</th>
                   <th className="px-4 py-3">Last Payment</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -627,7 +740,7 @@ const MembersList = () => {
               <tbody>
                 {members.length === 0 && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-gray-300" colSpan={13}>
+                    <td className="px-4 py-6 text-center text-gray-300" colSpan={14}>
                       No members found
                     </td>
                   </tr>
@@ -640,13 +753,13 @@ const MembersList = () => {
                         ? m.paymentHistory[m.paymentHistory.length - 1]
                         : null);
                     const lastPaymentLabel = lastPayment
-                      ? `${lastPayment.amount ?? 0} • ${formatDateTime(lastPayment.at)} • ${lastPayment.by?.name || "Unknown"} • ${formatAllocationRanges(lastPayment.allocations)}`
+                      ? `${lastPayment.amount ?? 0} • ${lastPayment.paymentMonth || "-"} • ${formatDateTime(lastPayment.at)} • ${lastPayment.by?.name || "Unknown"}`
                       : "-";
                     const cycles = Array.isArray(m.paymentCycles) ? m.paymentCycles : [];
                     const currentCycle = cycles.length ? cycles[cycles.length - 1] : null;
-                    const cycleLabel = currentCycle
-                      ? formatMonthRange(currentCycle.startDate, currentCycle.endDate)
-                      : "-";
+                    const expiryLabel = m.expiryDate
+                      ? new Date(m.expiryDate).toLocaleDateString()
+                      : (currentCycle?.endDate ? new Date(currentCycle.endDate).toLocaleDateString() : "-");
                     return (
                   <tr key={m._id} className="border-b border-gray-700">
                     <td className="px-4 py-3">
@@ -669,13 +782,15 @@ const MembersList = () => {
                     <td className="px-4 py-3">{m.fee ?? 0}</td>
                     <td className="px-4 py-3">{m.paidAmount ?? 0}</td>
                     <td className="px-4 py-3">
-                      {m.remainingAmount ?? Math.max((m.fee || 0) - (m.paidAmount || 0), 0)}
+                      {m.dueNowAmount ?? m.remainingAmount ?? Math.max((m.fee || 0) - (m.paidAmount || 0), 0)}
                     </td>
-                    <td className="px-4 py-3">{m.paymentStatus}</td>
+                    <td className="px-4 py-3">{m.displayPaymentStatus || m.paymentStatus}</td>
+                    <td className="px-4 py-3">{m.memberStatus || "Active"}</td>
                     <td className="px-4 py-3">
                       {m.startDate ? new Date(m.startDate).toLocaleDateString() : "-"}
                     </td>
-                    <td className="px-4 py-3">{cycleLabel}</td>
+                    <td className="px-4 py-3">{expiryLabel}</td>
+                    <td className="px-4 py-3">{m.lastPaymentMonth || "-"}</td>
                     <td className="px-4 py-3">{lastPaymentLabel}</td>
                     <td className="px-4 py-3 text-right space-x-2">
                       <Link
@@ -696,6 +811,21 @@ const MembersList = () => {
                       >
                         History
                       </button>
+                      {m.memberStatus === "Inactive" ? (
+                        <button
+                          onClick={() => updateMemberStatus(m, "Active")}
+                          className="inline-block px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-500 transition-all"
+                        >
+                          Mark Active
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => updateMemberStatus(m, "Inactive")}
+                          className="inline-block px-3 py-1 rounded bg-orange-600 text-white hover:bg-orange-500 transition-all"
+                        >
+                          Mark Inactive
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDelete(m._id)}
                         className="inline-block px-3 py-1 rounded bg-red-600 text-white hover:bg-red-500 transition-all"
@@ -773,7 +903,8 @@ const MembersList = () => {
                   <thead className="bg-gray-800 text-gray-100">
                     <tr>
                       <th className="px-3 py-2">Amount</th>
-                      <th className="px-3 py-2">Cycle</th>
+                      <th className="px-3 py-2">Month</th>
+                      <th className="px-3 py-2">Mode</th>
                       <th className="px-3 py-2">Date</th>
                       <th className="px-3 py-2">Received By</th>
                       <th className="px-3 py-2">Status</th>
@@ -796,7 +927,8 @@ const MembersList = () => {
                             p.amount ?? 0
                           )}
                         </td>
-                        <td className="px-3 py-2">{formatAllocationRanges(p.allocations)}</td>
+                        <td className="px-3 py-2">{p.paymentMonth || formatAllocationRanges(p.allocations)}</td>
+                        <td className="px-3 py-2">{p.paymentMode || "-"}</td>
                         <td className="px-3 py-2">{formatDateTime(p.at)}</td>
                         <td className="px-3 py-2">{p.by?.name || "Unknown"}</td>
                         <td className="px-3 py-2">
@@ -824,7 +956,9 @@ const MembersList = () => {
                               placeholder="Note"
                             />
                           ) : (
-                            p.note || "-"
+                            p.promiseDate
+                              ? `${p.note || "-"} | Promise: ${new Date(p.promiseDate).toLocaleDateString()}`
+                              : (p.note || "-")
                           )}
                         </td>
                         <td className="px-3 py-2 text-right">
@@ -924,6 +1058,9 @@ const MembersList = () => {
               </button>
             </div>
             <form onSubmit={submitPayment} className="p-5 space-y-4">
+              <div className="text-xs text-gray-300">
+                Current Due: Rs.{Number(payMember?.dueNowAmount ?? payMember?.remainingAmount ?? 0)}
+              </div>
               <div className="flex flex-col">
                 <label className="text-sm text-gray-300 mb-1">Amount</label>
                 <input
@@ -943,6 +1080,53 @@ const MembersList = () => {
                   className="p-2 rounded bg-gray-800 border border-gray-700"
                   required
                 />
+              </div>
+              {Number(payAmount || 0) > 0 &&
+                Number(payAmount || 0) < Number(payMember?.dueNowAmount ?? payMember?.remainingAmount ?? 0) && (
+                  <div className="flex flex-col">
+                    <label className="text-sm text-gray-300 mb-1">
+                      Remaining will be paid on
+                    </label>
+                    <input
+                      type="date"
+                      value={promiseDate}
+                      onChange={(e) => setPromiseDate(e.target.value)}
+                      min={payDate || undefined}
+                      className="p-2 rounded bg-gray-800 border border-gray-700"
+                      required
+                    />
+                  </div>
+                )}
+              <div className="flex flex-col">
+                <label className="text-sm text-gray-300 mb-1">Month</label>
+                <select
+                  value={payMonth}
+                  onChange={(e) => setPayMonth(e.target.value)}
+                  className="p-2 rounded bg-gray-800 border border-gray-700"
+                  required
+                >
+                  <option value="">Select month</option>
+                  {paymentMonthOptions.map((month) => (
+                    <option key={month} value={month}>
+                      {month}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col">
+                <label className="text-sm text-gray-300 mb-1">Payment Mode</label>
+                <select
+                  value={payMode}
+                  onChange={(e) => setPayMode(e.target.value)}
+                  className="p-2 rounded bg-gray-800 border border-gray-700"
+                  required
+                >
+                  <option>Cash</option>
+                  <option>UPI</option>
+                  <option>Card</option>
+                  <option>Bank Transfer</option>
+                  <option>Other</option>
+                </select>
               </div>
               <div className="flex flex-col">
                 <label className="text-sm text-gray-300 mb-1">Note</label>

@@ -174,6 +174,8 @@ const AdminDashBoard = () => {
   const [loading, setLoading] = useState(false);
   const [memberStats, setMemberStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [promisedMembers, setPromisedMembers] = useState([]);
+  const [promisedLoading, setPromisedLoading] = useState(false);
   const [range, setRange] = useState({ startDate: "", endDate: "" });
 
   // AOS Initialization
@@ -198,6 +200,7 @@ const AdminDashBoard = () => {
     getContacts();
     getFeedbacks();
     getMemberStats(start, end);
+    getPromisedPendingMembers();
   }, []);
 
   const getUsers = async () => {
@@ -293,6 +296,51 @@ const AdminDashBoard = () => {
     }
   }
 
+  const getPromisedPendingMembers = async () => {
+    try {
+      setPromisedLoading(true);
+      const res = await axios.get(`${BASE_URL}/api/v1/members`, {
+        params: {
+          listType: "reminder",
+          reminderStatus: "Promised",
+          page: 1,
+          limit: 100,
+          sortBy: "createdAt",
+          sortOrder: "desc",
+        },
+      });
+      if (res.data?.success) {
+        const members = Array.isArray(res.data.members) ? res.data.members : [];
+        const normalized = members
+          .filter((m) => m.reminderStatus === "Promised")
+          .map((m) => {
+            const history = Array.isArray(m.paymentHistory) ? m.paymentHistory : [];
+            const promisedEntry = [...history]
+              .reverse()
+              .find((p) => p.promiseDate);
+            return {
+              ...m,
+              effectivePromiseDate: m.promisedPaymentDate || promisedEntry?.promiseDate || null,
+            };
+          })
+          .sort((a, b) => {
+            const ad = a.effectivePromiseDate ? new Date(a.effectivePromiseDate).getTime() : Infinity;
+            const bd = b.effectivePromiseDate ? new Date(b.effectivePromiseDate).getTime() : Infinity;
+            return ad - bd;
+          });
+        setPromisedMembers(normalized);
+      } else {
+        setPromisedMembers([]);
+      }
+      setPromisedLoading(false);
+    } catch (err) {
+      console.log(err);
+      toast.error("Something went wrong in getting promised pending members");
+      setPromisedMembers([]);
+      setPromisedLoading(false);
+    }
+  };
+
   if (loading) {
     return <Loader />
   }
@@ -326,7 +374,10 @@ const AdminDashBoard = () => {
               />
             </div>
             <button
-              onClick={() => getMemberStats(range.startDate, range.endDate)}
+              onClick={() => {
+                getMemberStats(range.startDate, range.endDate);
+                getPromisedPendingMembers();
+              }}
               className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-all"
             >
               Apply
@@ -564,6 +615,60 @@ const AdminDashBoard = () => {
                 }}
               />
             </div>
+          )}
+        </div>
+
+        <div className="bg-gray-800 p-5 border border-white mt-10" data-aos="fade-up">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white text-xl font-semibold">Promised Pending</h3>
+            <Link
+              to="/dashboard/admin/members"
+              className="text-sm text-yellow-400 hover:underline"
+            >
+              View Members
+            </Link>
+          </div>
+          {promisedLoading && <p className="text-gray-300">Loading...</p>}
+          {!promisedLoading && (
+            <>
+              <p className="text-gray-300 mb-3">Count: {promisedMembers.length}</p>
+              {promisedMembers.length === 0 ? (
+                <p className="text-gray-400">No promised pending members.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-sm text-gray-200">
+                    <thead className="bg-gray-700 text-gray-100">
+                      <tr>
+                        <th className="px-4 py-3">Name</th>
+                        <th className="px-4 py-3">Phone</th>
+                        <th className="px-4 py-3">Promise Date</th>
+                        <th className="px-4 py-3">Due</th>
+                        <th className="px-4 py-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {promisedMembers.map((m) => (
+                        <tr key={m._id} className="border-b border-gray-700">
+                          <td className="px-4 py-3">{m.name}</td>
+                          <td className="px-4 py-3">{m.phone}</td>
+                          <td className="px-4 py-3">
+                            {m.effectivePromiseDate
+                              ? new Date(m.effectivePromiseDate).toLocaleDateString()
+                              : "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {m.dueNowAmount ?? m.remainingAmount ?? 0}
+                          </td>
+                          <td className="px-4 py-3">
+                            {m.displayPaymentStatus || m.paymentStatus || "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
 

@@ -14,6 +14,8 @@ const EditMember = () => {
   const [carryForward, setCarryForward] = useState(0);
   const [adjustPayment, setAdjustPayment] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [extendDays, setExtendDays] = useState("");
+  const [originalMemberStatus, setOriginalMemberStatus] = useState("Active");
 
   const [member, setMember] = useState({
     name: "",
@@ -32,6 +34,8 @@ const EditMember = () => {
     paidAmount: 0,
     remainingAmount: 0,
     paymentStatus: "Paid",
+    memberStatus: "Active",
+    reminderStatus: "None",
     personalTrainer: "Not Assigned",
     assignedTrainer: "",
     profilePic: "",
@@ -88,10 +92,13 @@ const EditMember = () => {
           paidAmount,
           remainingAmount,
           paymentStatus: m.paymentStatus || "Paid",
+          memberStatus: m.memberStatus || "Active",
+          reminderStatus: m.reminderStatus || "None",
           personalTrainer: m.personalTrainer || "Not Assigned",
           assignedTrainer: m.assignedTrainer || "",
           profilePic: m.profilePic || "",
         });
+        setOriginalMemberStatus(m.memberStatus || "Active");
       } else {
         setError(res.data?.message || "Failed to load member");
       }
@@ -108,11 +115,23 @@ const EditMember = () => {
     setError("");
     try {
       const payload = { ...member };
+      if (member.memberStatus !== originalMemberStatus) {
+        const statusRes = await axios.put(`${BASE_URL}/api/v1/members/${id}/status`, {
+          memberStatus: member.memberStatus,
+        });
+        if (!statusRes.data?.success) {
+          setError(statusRes.data?.message || "Failed to update member status");
+          setLoading(false);
+          return;
+        }
+        setOriginalMemberStatus(member.memberStatus);
+      }
       if (!adjustPayment) {
         delete payload.paidAmount;
         delete payload.remainingAmount;
         delete payload.paymentStatus;
       }
+      delete payload.memberStatus;
       const res = await axios.put(`${BASE_URL}/api/v1/members/${id}`, payload);
       if (res.data?.success) {
         toast.success("Member updated");
@@ -147,6 +166,47 @@ const EditMember = () => {
       toast.error(err.response?.data?.message || "Upload failed");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleExtendMembership = async () => {
+    const days = Number(extendDays || 0);
+    if (!days || days <= 0) {
+      toast.error("Enter valid extend days");
+      return;
+    }
+    try {
+      const res = await axios.post(`${BASE_URL}/api/v1/members/${id}/extend`, {
+        extendDays: days,
+      });
+      if (res.data?.success) {
+        toast.success("Membership extended");
+        setExtendDays("");
+        fetchMember();
+      } else {
+        toast.error(res.data?.message || "Failed to extend membership");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to extend membership");
+    }
+  };
+
+  const handleRestartCycle = async () => {
+    if (!window.confirm("Start a fresh membership cycle now?")) return;
+    try {
+      const res = await axios.post(`${BASE_URL}/api/v1/members/${id}/restart`, {
+        startDate: new Date().toISOString().slice(0, 10),
+        duration: member.duration,
+        fee: Number(member.fee || 0),
+      });
+      if (res.data?.success) {
+        toast.success("New cycle started");
+        fetchMember();
+      } else {
+        toast.error(res.data?.message || "Failed to restart cycle");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to restart cycle");
     }
   };
 
@@ -383,6 +443,32 @@ const EditMember = () => {
           </div>
 
           <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">Member Status</label>
+            <select
+              id="memberStatus"
+              value={member.memberStatus}
+              onChange={handleChange}
+              className="p-3 rounded-md outline-none w-full"
+            >
+              <option>Active</option>
+              <option>Inactive</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">Reminder Status</label>
+            <select
+              id="reminderStatus"
+              value={member.reminderStatus}
+              onChange={handleChange}
+              className="p-3 rounded-md outline-none w-full"
+            >
+              <option>None</option>
+              <option value="Promised">Promised to Pay</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col">
             <label className="text-white font-bold mb-1">Personal Trainer</label>
             <select
               id="personalTrainer"
@@ -402,6 +488,36 @@ const EditMember = () => {
             onChange={handleChange}
             className="p-3 rounded-md outline-none w-full"
           />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="flex flex-col">
+              <label className="text-white font-bold mb-1">Extend Days (Manual)</label>
+              <input
+                type="number"
+                value={extendDays}
+                onChange={(e) => setExtendDays(e.target.value)}
+                className="p-3 rounded-md outline-none w-full"
+                placeholder="Enter days"
+              />
+            </div>
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={handleExtendMembership}
+                className="w-full px-4 py-3 text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-all"
+              >
+                Extend Membership
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRestartCycle}
+            className="px-5 py-3 text-white bg-orange-600 rounded-md hover:bg-orange-700 transition-all"
+          >
+            Start Fresh Cycle
+          </button>
 
           <button
             type="submit"

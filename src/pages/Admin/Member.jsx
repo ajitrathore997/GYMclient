@@ -27,6 +27,8 @@ const AddMember = () => {
     paidAmount: 0,
     remainingAmount: 0,
     paymentStatus: "Paid",
+    memberStatus: "Active",
+    reminderStatus: "None",
     personalTrainer: "Not Assigned",
     assignedTrainer: "",
     profilePic: "",
