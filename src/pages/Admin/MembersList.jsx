@@ -14,9 +14,18 @@ const MembersList = () => {
   const [limit, setLimit] = useState(20);
   const [selectedMember, setSelectedMember] = useState(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isCycleOpen, setIsCycleOpen] = useState(false);
   const [editingHistoryIndex, setEditingHistoryIndex] = useState(null);
   const [editAmount, setEditAmount] = useState("");
   const [editNote, setEditNote] = useState("");
+  const [editMonth, setEditMonth] = useState("");
+  const [editMode, setEditMode] = useState("Cash");
+  const [editDate, setEditDate] = useState("");
+  const [editPromiseDate, setEditPromiseDate] = useState("");
+  const [adjustAmount, setAdjustAmount] = useState("");
+  const [adjustNote, setAdjustNote] = useState("");
+  const [adjustMonth, setAdjustMonth] = useState("");
+  const [adjustMode, setAdjustMode] = useState("Cash");
   const [editingStatusIndex, setEditingStatusIndex] = useState(null);
   const [editStatus, setEditStatus] = useState("Paid");
   const [isPayOpen, setIsPayOpen] = useState(false);
@@ -27,6 +36,7 @@ const MembersList = () => {
   const [payMonth, setPayMonth] = useState("");
   const [payMode, setPayMode] = useState("Cash");
   const [promiseDate, setPromiseDate] = useState("");
+  const [payMonthOptions, setPayMonthOptions] = useState([]);
   const [listType, setListType] = useState("all");
 
   const [filters, setFilters] = useState({
@@ -95,20 +105,70 @@ const MembersList = () => {
     return Math.max(Math.ceil(total / limit), 1);
   }, [total, limit]);
 
-  const paymentMonthOptions = useMemo(() => {
+  const parseMonthLabel = (label) => {
+    if (!label) return null;
+    const parsed = new Date(`01 ${label}`);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return new Date(parsed.getFullYear(), parsed.getMonth(), 1);
+  };
+
+  const formatMonthLabel = (d) =>
+    d.toLocaleString(undefined, { month: "long", year: "numeric" });
+
+  const toInputDate = (value) => {
+    if (!value) return "";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 10);
+  };
+
+  const buildMonthOptionsForMember = (member) => {
     const now = new Date();
-    const options = [];
-    for (let i = -3; i <= 8; i += 1) {
-      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      options.push(
-        d.toLocaleString(undefined, {
-          month: "long",
-          year: "numeric",
-        })
-      );
+    const activation = member?.activationDate || member?.startDate;
+    const start = activation ? new Date(activation) : new Date(now.getFullYear(), now.getMonth() - 24, 1);
+    if (Number.isNaN(start.getTime())) {
+      return [];
     }
-    return options;
-  }, []);
+    const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+    const horizon = new Date(now.getFullYear(), now.getMonth() + 12, 1);
+    const out = [];
+    const cursor = new Date(startMonth);
+    while (cursor <= horizon) {
+      out.push(formatMonthLabel(cursor));
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    return out;
+  };
+
+  const getSelectedMonthCycleDue = (member, monthLabel) => {
+    if (!member || !monthLabel) return null;
+    const target = parseMonthLabel(monthLabel);
+    if (!target) return null;
+    const activationBase = member.activationDate || member.startDate;
+    if (activationBase) {
+      const activation = new Date(activationBase);
+      if (!Number.isNaN(activation.getTime())) {
+        const activationMonth = new Date(activation.getFullYear(), activation.getMonth(), 1);
+        if (target < activationMonth) {
+          return null;
+        }
+      }
+    }
+    const cycles = Array.isArray(member.paymentCycles) ? member.paymentCycles : [];
+    const cycle = cycles.find((c) => {
+      const s = c?.startDate ? new Date(c.startDate) : null;
+      const e = c?.endDate ? new Date(c.endDate) : null;
+      if (!s || !e || Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return false;
+      const startMonth = new Date(s.getFullYear(), s.getMonth(), 1);
+      const endMonth = new Date(e.getFullYear(), e.getMonth(), 1);
+      return target >= startMonth && target < endMonth;
+    });
+    if (cycle) return Number(cycle.remainingAmount || 0);
+
+    // For historical/backfill month entries where future cycles are not materialized yet,
+    // use one-cycle fee as due instead of falling back to total outstanding.
+    return Number(member.fee || 0);
+  };
 
   const handleFilterChange = (e) => {
     const { id, value } = e.target;
@@ -158,10 +218,24 @@ const MembersList = () => {
     setPayNote("");
     const today = new Date().toISOString().slice(0, 10);
     setPayDate(today);
-    setPayMonth(new Date().toLocaleString(undefined, { month: "long", year: "numeric" }));
+    const options = buildMonthOptionsForMember(member);
+    setPayMonthOptions(options);
+    setPayMonth(options.includes(new Date().toLocaleString(undefined, { month: "long", year: "numeric" }))
+      ? new Date().toLocaleString(undefined, { month: "long", year: "numeric" })
+      : (options[options.length - 1] || ""));
     setPayMode("Cash");
     setPromiseDate("");
     setIsPayOpen(true);
+  };
+
+  const openCycles = (member) => {
+    setSelectedMember(member);
+    setIsCycleOpen(true);
+  };
+
+  const closeCycles = () => {
+    setIsCycleOpen(false);
+    setSelectedMember(null);
   };
 
   const closePay = () => {
@@ -173,6 +247,7 @@ const MembersList = () => {
     setPayMonth("");
     setPayMode("Cash");
     setPromiseDate("");
+    setPayMonthOptions([]);
   };
 
   const formatDateTime = (value) => {
@@ -352,16 +427,25 @@ const MembersList = () => {
   };
 
 
-  const startEditHistory = (index, amount) => {
+  const startEditHistory = (index, payment) => {
     setEditingHistoryIndex(index);
-    setEditAmount(amount ?? 0);
-    setEditNote("");
+    setEditAmount(payment?.amount ?? 0);
+    setEditNote(payment?.note || "");
+    setEditMonth(payment?.paymentMonth || "");
+    setEditMode(payment?.paymentMode || "Cash");
+    setEditDate(toInputDate(payment?.at));
+    setEditPromiseDate(toInputDate(payment?.promiseDate));
+    setEditStatus(payment?.paymentStatus || "Paid");
   };
 
   const cancelEditHistory = () => {
     setEditingHistoryIndex(null);
     setEditAmount("");
     setEditNote("");
+    setEditMonth("");
+    setEditMode("Cash");
+    setEditDate("");
+    setEditPromiseDate("");
   };
 
   const startEditStatus = (index, status) => {
@@ -374,6 +458,41 @@ const MembersList = () => {
     setEditStatus("Paid");
   };
 
+  const submitManualAdjustment = async () => {
+    if (!selectedMember?._id) return;
+    const delta = Number(adjustAmount || 0);
+    if (!delta) {
+      toast.error("Enter non-zero adjustment amount");
+      return;
+    }
+    try {
+      const res = await axios.put(
+        `${BASE_URL}/api/v1/members/${selectedMember._id}/payment-history`,
+        {
+          adjustmentAmount: delta,
+          note: adjustNote,
+          paymentMonth: adjustMonth || undefined,
+          paymentMode: adjustMode || "Cash",
+        }
+      );
+      if (res.data?.success) {
+        toast.success("Manual adjustment saved");
+        setSelectedMember(res.data.member);
+        setMembers((prev) =>
+          prev.map((m) => (m._id === res.data.member._id ? res.data.member : m))
+        );
+        setAdjustAmount("");
+        setAdjustNote("");
+        setAdjustMonth("");
+        setAdjustMode("Cash");
+      } else {
+        toast.error(res.data?.message || "Failed to save adjustment");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to save adjustment");
+    }
+  };
+
   const saveEditHistory = async (index) => {
     if (!selectedMember?._id) return;
     try {
@@ -381,6 +500,11 @@ const MembersList = () => {
         historyIndex: index,
         newAmount: Number(editAmount || 0),
         note: editNote,
+        paymentMonth: editMonth || undefined,
+        paymentMode: editMode || undefined,
+        date: editDate || undefined,
+        paymentStatus: editStatus || undefined,
+        promiseDate: editPromiseDate || null,
       };
       const res = await axios.put(
         `${BASE_URL}/api/v1/members/${selectedMember._id}/payment-history`,
@@ -448,19 +572,12 @@ const MembersList = () => {
   const submitPayment = async (e) => {
     e.preventDefault();
     if (!payMember?._id) return;
+    const monthCycleDue = getSelectedMonthCycleDue(payMember, payMonth);
     const dueAmount = Number(
-      payMember.dueNowAmount ?? payMember.remainingAmount ?? 0
+      monthCycleDue ?? payMember?.dueNowAmount ?? payMember?.remainingAmount ?? 0
     );
     const enteredAmount = Number(payAmount || 0);
     const needsPromiseDate = enteredAmount > 0 && enteredAmount < dueAmount;
-    if (needsPromiseDate && !promiseDate) {
-      toast.error("Please select when remaining amount will be paid");
-      return;
-    }
-    if (needsPromiseDate && payDate && promiseDate && new Date(promiseDate) < new Date(payDate)) {
-      toast.error("Promise date cannot be earlier than payment date");
-      return;
-    }
     try {
       const payload = {
         amount: enteredAmount,
@@ -468,7 +585,7 @@ const MembersList = () => {
         date: payDate,
         paymentMonth: payMonth,
         paymentMode: payMode,
-        promiseDate: needsPromiseDate ? promiseDate : undefined,
+        promiseDate: needsPromiseDate ? promiseDate || undefined : undefined,
       };
       const res = await axios.post(
         `${BASE_URL}/api/v1/members/${payMember._id}/pay`,
@@ -818,6 +935,12 @@ const MembersList = () => {
                       >
                         History
                       </button>
+                      <button
+                        onClick={() => openCycles(m)}
+                        className="inline-block px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500 transition-all"
+                      >
+                        Cycles
+                      </button>
                       {m.memberStatus === "Inactive" ? (
                         <button
                           onClick={() => updateMemberStatus(m, "Active")}
@@ -902,6 +1025,50 @@ const MembersList = () => {
               </button>
             </div>
             <div className="p-5 max-h-[70vh] overflow-y-auto">
+              <div className="mb-4 p-3 rounded border border-gray-700 bg-gray-800/60">
+                <div className="text-sm font-semibold text-white mb-2">Manual Adjustment</div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                  <input
+                    type="number"
+                    value={adjustAmount}
+                    onChange={(e) => setAdjustAmount(e.target.value)}
+                    className="p-2 rounded bg-gray-900 border border-gray-700"
+                    placeholder="+ credit / - debit"
+                  />
+                  <input
+                    type="text"
+                    value={adjustMonth}
+                    onChange={(e) => setAdjustMonth(e.target.value)}
+                    className="p-2 rounded bg-gray-900 border border-gray-700"
+                    placeholder="January 2026"
+                  />
+                  <select
+                    value={adjustMode}
+                    onChange={(e) => setAdjustMode(e.target.value)}
+                    className="p-2 rounded bg-gray-900 border border-gray-700"
+                  >
+                    <option>Cash</option>
+                    <option>UPI</option>
+                    <option>Card</option>
+                    <option>Bank Transfer</option>
+                    <option>Other</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={submitManualAdjustment}
+                    className="px-3 py-2 rounded bg-amber-600 text-white hover:bg-amber-500 transition-all"
+                  >
+                    Add Adjustment
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={adjustNote}
+                  onChange={(e) => setAdjustNote(e.target.value)}
+                  className="mt-2 w-full p-2 rounded bg-gray-900 border border-gray-700"
+                  placeholder="Adjustment note (optional)"
+                />
+              </div>
               {(!selectedMember?.paymentHistory || selectedMember.paymentHistory.length === 0) && (
                 <div className="text-gray-300">No payment history</div>
               )}
@@ -934,9 +1101,48 @@ const MembersList = () => {
                             p.amount ?? 0
                           )}
                         </td>
-                        <td className="px-3 py-2">{p.paymentMonth || formatAllocationRanges(p.allocations)}</td>
-                        <td className="px-3 py-2">{p.paymentMode || "-"}</td>
-                        <td className="px-3 py-2">{formatDateTime(p.at)}</td>
+                        <td className="px-3 py-2">
+                          {editingHistoryIndex === idx ? (
+                            <input
+                              type="text"
+                              value={editMonth}
+                              onChange={(e) => setEditMonth(e.target.value)}
+                              className="p-1 rounded bg-gray-800 border border-gray-700 w-36"
+                              placeholder="January 2026"
+                            />
+                          ) : (
+                            p.paymentMonth || formatAllocationRanges(p.allocations)
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {editingHistoryIndex === idx ? (
+                            <select
+                              value={editMode}
+                              onChange={(e) => setEditMode(e.target.value)}
+                              className="p-1 rounded bg-gray-800 border border-gray-700"
+                            >
+                              <option>Cash</option>
+                              <option>UPI</option>
+                              <option>Card</option>
+                              <option>Bank Transfer</option>
+                              <option>Other</option>
+                            </select>
+                          ) : (
+                            p.paymentMode || "-"
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          {editingHistoryIndex === idx ? (
+                            <input
+                              type="date"
+                              value={editDate}
+                              onChange={(e) => setEditDate(e.target.value)}
+                              className="p-1 rounded bg-gray-800 border border-gray-700"
+                            />
+                          ) : (
+                            formatDateTime(p.at)
+                          )}
+                        </td>
                         <td className="px-3 py-2">{p.by?.name || "Unknown"}</td>
                         <td className="px-3 py-2">
                           {editingStatusIndex === idx ? (
@@ -955,17 +1161,25 @@ const MembersList = () => {
                         </td>
                         <td className="px-3 py-2">
                           {editingHistoryIndex === idx ? (
-                            <input
-                              type="text"
-                              value={editNote}
-                              onChange={(e) => setEditNote(e.target.value)}
-                              className="p-1 rounded bg-gray-800 border border-gray-700 w-40"
-                              placeholder="Note"
-                            />
+                            <div className="space-y-1">
+                              <input
+                                type="text"
+                                value={editNote}
+                                onChange={(e) => setEditNote(e.target.value)}
+                                className="p-1 rounded bg-gray-800 border border-gray-700 w-40"
+                                placeholder="Note"
+                              />
+                              <input
+                                type="date"
+                                value={editPromiseDate}
+                                onChange={(e) => setEditPromiseDate(e.target.value)}
+                                className="p-1 rounded bg-gray-800 border border-gray-700 w-40"
+                              />
+                            </div>
+                          ) : p.promiseDate ? (
+                            `${p.note || "-"} | Promise: ${new Date(p.promiseDate).toLocaleDateString()}`
                           ) : (
-                            p.promiseDate
-                              ? `${p.note || "-"} | Promise: ${new Date(p.promiseDate).toLocaleDateString()}`
-                              : (p.note || "-")
+                            p.note || "-"
                           )}
                         </td>
                         <td className="px-3 py-2 text-right">
@@ -989,7 +1203,7 @@ const MembersList = () => {
                               ) : (
                                 <div className="space-x-2">
                                   <button
-                                    onClick={() => startEditHistory(idx, p.amount)}
+                                    onClick={() => startEditHistory(idx, p)}
                                     className="px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-500 transition-all"
                                   >
                                     Edit
@@ -1050,6 +1264,57 @@ const MembersList = () => {
         </div>
       )}
 
+      {isCycleOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-gray-900 text-gray-100 w-full max-w-4xl rounded-lg shadow-lg">
+            <div className="flex items-center justify-between border-b border-gray-700 px-5 py-4">
+              <div className="text-lg font-semibold">
+                Cycle History {selectedMember?.name ? `• ${selectedMember.name}` : ""}
+              </div>
+              <button
+                onClick={closeCycles}
+                className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition-all"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-5 max-h-[70vh] overflow-y-auto">
+              {(!selectedMember?.paymentCycles || selectedMember.paymentCycles.length === 0) && (
+                <div className="text-gray-300">No cycle history</div>
+              )}
+              {selectedMember?.paymentCycles && selectedMember.paymentCycles.length > 0 && (
+                <table className="min-w-full text-left text-sm text-gray-200">
+                  <thead className="bg-gray-800 text-gray-100">
+                    <tr>
+                      <th className="px-3 py-2">Start</th>
+                      <th className="px-3 py-2">End</th>
+                      <th className="px-3 py-2">Fee</th>
+                      <th className="px-3 py-2">Paid</th>
+                      <th className="px-3 py-2">Due</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Payments</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...selectedMember.paymentCycles].map((c, idx) => (
+                      <tr key={`${c.startDate || "cycle"}-${idx}`} className="border-b border-gray-800">
+                        <td className="px-3 py-2">{c.startDate ? new Date(c.startDate).toLocaleDateString() : "-"}</td>
+                        <td className="px-3 py-2">{c.endDate ? new Date(c.endDate).toLocaleDateString() : "-"}</td>
+                        <td className="px-3 py-2">{Number(c.fee || 0)}</td>
+                        <td className="px-3 py-2">{Number(c.paidAmount || 0)}</td>
+                        <td className="px-3 py-2">{Number(c.remainingAmount || 0)}</td>
+                        <td className="px-3 py-2">{c.status || "-"}</td>
+                        <td className="px-3 py-2">{Array.isArray(c.payments) ? c.payments.length : 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {isPayOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-gray-900 text-gray-100 w-full max-w-md rounded-lg shadow-lg">
@@ -1066,7 +1331,12 @@ const MembersList = () => {
             </div>
             <form onSubmit={submitPayment} className="p-5 space-y-4">
               <div className="text-xs text-gray-300">
-                Current Due: Rs.{Number(payMember?.dueNowAmount ?? payMember?.remainingAmount ?? 0)}
+                Current Due: Rs.{Number(
+                  getSelectedMonthCycleDue(payMember, payMonth) ??
+                    payMember?.dueNowAmount ??
+                    payMember?.remainingAmount ??
+                    0
+                )}
               </div>
               <div className="flex flex-col">
                 <label className="text-sm text-gray-300 mb-1">Amount</label>
@@ -1089,7 +1359,12 @@ const MembersList = () => {
                 />
               </div>
               {Number(payAmount || 0) > 0 &&
-                Number(payAmount || 0) < Number(payMember?.dueNowAmount ?? payMember?.remainingAmount ?? 0) && (
+                Number(payAmount || 0) < Number(
+                  getSelectedMonthCycleDue(payMember, payMonth) ??
+                    payMember?.dueNowAmount ??
+                    payMember?.remainingAmount ??
+                    0
+                ) && (
                   <div className="flex flex-col">
                     <label className="text-sm text-gray-300 mb-1">
                       Remaining will be paid on
@@ -1098,9 +1373,7 @@ const MembersList = () => {
                       type="date"
                       value={promiseDate}
                       onChange={(e) => setPromiseDate(e.target.value)}
-                      min={payDate || undefined}
                       className="p-2 rounded bg-gray-800 border border-gray-700"
-                      required
                     />
                   </div>
                 )}
@@ -1113,7 +1386,7 @@ const MembersList = () => {
                   required
                 >
                   <option value="">Select month</option>
-                  {paymentMonthOptions.map((month) => (
+                  {payMonthOptions.map((month) => (
                     <option key={month} value={month}>
                       {month}
                     </option>

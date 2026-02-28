@@ -28,6 +28,7 @@ const AddMember = () => {
     duration: "1 Month",
     fee: 0,
     paidAmount: 0,
+    paymentMode: "Cash",
     remainingAmount: 0,
     paymentStatus: "Paid",
     memberStatus: "Active",
@@ -129,6 +130,17 @@ const AddMember = () => {
 
           {error && <div className="text-red-500 text-center">{error}</div>}
 
+<div className="flex flex-col">
+            <label className="text-white font-bold mb-1">Registration Date</label>
+            <input
+              type="date"
+              id="registrationDate"
+              value={member.registrationDate}
+              onChange={handleChange}
+              className="p-3 rounded-md outline-none w-full"
+            />
+          </div>
+          
           {/* Personal Info */}
           <input
             type="text"
@@ -234,17 +246,6 @@ const AddMember = () => {
           </div>
 
           <div className="flex flex-col">
-            <label className="text-white font-bold mb-1">Registration Date</label>
-            <input
-              type="date"
-              id="registrationDate"
-              value={member.registrationDate}
-              onChange={handleChange}
-              className="p-3 rounded-md outline-none w-full"
-            />
-          </div>
-
-          <div className="flex flex-col">
             <label className="text-white font-bold mb-1">Activation Date</label>
             <input
               type="date"
@@ -292,6 +293,22 @@ const AddMember = () => {
               onChange={handleChange}
               className="p-3 rounded-md outline-none w-full"
             />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">Payment Mode</label>
+            <select
+              id="paymentMode"
+              value={member.paymentMode}
+              onChange={handleChange}
+              className="p-3 rounded-md outline-none w-full"
+            >
+              <option>Cash</option>
+              <option>UPI</option>
+              <option>Card</option>
+              <option>Bank Transfer</option>
+              <option>Other</option>
+            </select>
           </div>
 
           <div className="flex flex-col">

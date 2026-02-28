@@ -299,19 +299,31 @@ const AdminDashBoard = () => {
   const getPromisedPendingMembers = async () => {
     try {
       setPromisedLoading(true);
-      const res = await axios.get(`${BASE_URL}/api/v1/members`, {
-        params: {
-          listType: "reminder",
-          reminderStatus: "Promised",
-          page: 1,
-          limit: 100,
-          sortBy: "createdAt",
-          sortOrder: "desc",
-        },
-      });
-      if (res.data?.success) {
-        const members = Array.isArray(res.data.members) ? res.data.members : [];
-        const normalized = members
+      const collected = [];
+      const pageSize = 100;
+      let page = 1;
+      let totalPages = 1;
+
+      while (page <= totalPages) {
+        const res = await axios.get(`${BASE_URL}/api/v1/members`, {
+          params: {
+            listType: "reminder",
+            reminderStatus: "Promised",
+            page,
+            limit: pageSize,
+            sortBy: "createdAt",
+            sortOrder: "desc",
+          },
+        });
+        if (!res.data?.success) break;
+        const chunk = Array.isArray(res.data.members) ? res.data.members : [];
+        collected.push(...chunk);
+        totalPages = Number(res.data.totalPages || 1);
+        page += 1;
+      }
+
+      if (collected.length) {
+        const normalized = collected
           .filter((m) => m.reminderStatus === "Promised")
           .map((m) => {
             const history = Array.isArray(m.paymentHistory) ? m.paymentHistory : [];
@@ -413,6 +425,30 @@ const AdminDashBoard = () => {
             <p className="text-gray-300 text-sm">Paid In Range</p>
             <h3 className="text-white font-bold text-3xl">
               {memberStats ? memberStats.paidInRange : "Loading..."}
+            </h3>
+          </div>
+          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="350">
+            <p className="text-gray-300 text-sm">Total Due Now</p>
+            <h3 className="text-white font-bold text-3xl">
+              {memberStats ? memberStats.totalDueNow : "Loading..."}
+            </h3>
+          </div>
+          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="400">
+            <p className="text-gray-300 text-sm">Overdue Members</p>
+            <h3 className="text-white font-bold text-3xl">
+              {memberStats ? memberStats.overdueMembersCount : "Loading..."}
+            </h3>
+          </div>
+          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="450">
+            <p className="text-gray-300 text-sm">Promised Members</p>
+            <h3 className="text-white font-bold text-3xl">
+              {memberStats ? memberStats.promisedMembersCount : "Loading..."}
+            </h3>
+          </div>
+          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="500">
+            <p className="text-gray-300 text-sm">Promised Due</p>
+            <h3 className="text-white font-bold text-3xl">
+              {memberStats ? memberStats.promisedDueAmount : "Loading..."}
             </h3>
           </div>
         </div>
@@ -615,6 +651,57 @@ const AdminDashBoard = () => {
                 }}
               />
             </div>
+          )}
+        </div>
+
+        <div className="bg-gray-800 p-5 border border-white mt-10" data-aos="fade-up">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white text-xl font-semibold">Defaulters (Top Due)</h3>
+            <Link
+              to="/dashboard/admin/members"
+              className="text-sm text-yellow-400 hover:underline"
+            >
+              View Members
+            </Link>
+          </div>
+          {statsLoading && <p className="text-gray-300">Loading...</p>}
+          {!statsLoading && memberStats && (
+            <>
+              {(!memberStats.defaulters || memberStats.defaulters.length === 0) ? (
+                <p className="text-gray-400">No defaulters right now.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-sm text-gray-200">
+                    <thead className="bg-gray-700 text-gray-100">
+                      <tr>
+                        <th className="px-4 py-3">Name</th>
+                        <th className="px-4 py-3">Phone</th>
+                        <th className="px-4 py-3">Due</th>
+                        <th className="px-4 py-3">Cycle End</th>
+                        <th className="px-4 py-3">Promised Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {memberStats.defaulters.map((m) => (
+                        <tr key={m._id} className="border-b border-gray-700">
+                          <td className="px-4 py-3">{m.name}</td>
+                          <td className="px-4 py-3">{m.phone}</td>
+                          <td className="px-4 py-3">{m.dueAmount}</td>
+                          <td className="px-4 py-3">
+                            {m.endDate ? new Date(m.endDate).toLocaleDateString() : "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {m.promisedPaymentDate
+                              ? new Date(m.promisedPaymentDate).toLocaleDateString()
+                              : "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
 

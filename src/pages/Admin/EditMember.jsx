@@ -16,6 +16,7 @@ const EditMember = () => {
   const [uploading, setUploading] = useState(false);
   const [extendDays, setExtendDays] = useState("");
   const [originalMemberStatus, setOriginalMemberStatus] = useState("Active");
+  const [originalActivationDate, setOriginalActivationDate] = useState("");
 
   const [member, setMember] = useState({
     name: "",
@@ -113,6 +114,11 @@ const EditMember = () => {
           profilePic: m.profilePic || "",
         });
         setOriginalMemberStatus(m.memberStatus || "Active");
+        setOriginalActivationDate(
+          m.activationDate
+            ? new Date(m.activationDate).toISOString().slice(0, 10)
+            : (m.startDate ? new Date(m.startDate).toISOString().slice(0, 10) : "")
+        );
       } else {
         setError(res.data?.message || "Failed to load member");
       }
@@ -132,6 +138,9 @@ const EditMember = () => {
       if (member.memberStatus !== originalMemberStatus) {
         const statusRes = await axios.put(`${BASE_URL}/api/v1/members/${id}/status`, {
           memberStatus: member.memberStatus,
+          startDate: member.activationDate || member.startDate,
+          duration: member.duration,
+          fee: Number(member.fee || 0),
         });
         if (!statusRes.data?.success) {
           setError(statusRes.data?.message || "Failed to update member status");
@@ -146,6 +155,9 @@ const EditMember = () => {
         delete payload.paymentStatus;
       }
       payload.startDate = payload.activationDate || payload.startDate;
+      payload.realignCyclesOnActivationChange =
+        Boolean(payload.activationDate) &&
+        payload.activationDate !== originalActivationDate;
       delete payload.memberStatus;
       const res = await axios.put(`${BASE_URL}/api/v1/members/${id}`, payload);
       if (res.data?.success) {
@@ -208,14 +220,50 @@ const EditMember = () => {
 
   const handleRestartCycle = async () => {
     if (!window.confirm("Start a fresh membership cycle now?")) return;
+    const monthChoiceRaw = window.prompt(
+      "Select plan months for new cycle: 1, 3, 6, or 12",
+      "1"
+    );
+    if (monthChoiceRaw === null) return;
+    const monthChoice = String(monthChoiceRaw).trim();
+    const durationMap = {
+      "1": "1 Month",
+      "3": "3 Months",
+      "6": "6 Months",
+      "12": "1 Year",
+    };
+    const nextDuration = durationMap[monthChoice];
+    if (!nextDuration) {
+      toast.error("Invalid selection. Use only 1, 3, 6, or 12.");
+      return;
+    }
+    const feeRaw = window.prompt(
+      "Enter fee for this new cycle",
+      String(Number(member.fee || 0))
+    );
+    if (feeRaw === null) return;
+    const nextFee = Number(String(feeRaw).trim());
+    if (!Number.isFinite(nextFee) || nextFee < 0) {
+      toast.error("Invalid fee. Enter a valid number (0 or more).");
+      return;
+    }
+    const includePreviousDue = window.confirm(
+      "Include previous pending due in the new cycle?\n\nOK = Include due\nCancel = Clear previous due"
+    );
     try {
       const res = await axios.post(`${BASE_URL}/api/v1/members/${id}/restart`, {
         startDate: new Date().toISOString().slice(0, 10),
-        duration: member.duration,
-        fee: Number(member.fee || 0),
+        duration: nextDuration,
+        fee: nextFee,
+        includePreviousDue,
       });
       if (res.data?.success) {
-        toast.success("New cycle started");
+        toast.success(
+          includePreviousDue
+            ? "New cycle started with previous due included"
+            : "New cycle started and previous due cleared"
+        );
+        setMember((prev) => ({ ...prev, duration: nextDuration, fee: nextFee }));
         fetchMember();
       } else {
         toast.error(res.data?.message || "Failed to restart cycle");
@@ -249,6 +297,17 @@ const EditMember = () => {
           className="flex flex-col gap-5 w-full max-w-3xl"
           onSubmit={handleSubmit}
         >
+          <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">Registration Date</label>
+            <input
+              type="date"
+              id="registrationDate"
+              value={member.registrationDate}
+              onChange={handleChange}
+              className="p-3 rounded-md outline-none w-full"
+            />
+          </div>
+          
           <input
             type="text"
             placeholder="Full Name"
@@ -348,17 +407,6 @@ const EditMember = () => {
                 className="mt-2 w-24 h-24 object-cover rounded"
               />
             )}
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-white font-bold mb-1">Registration Date</label>
-            <input
-              type="date"
-              id="registrationDate"
-              value={member.registrationDate}
-              onChange={handleChange}
-              className="p-3 rounded-md outline-none w-full"
-            />
           </div>
 
           <div className="flex flex-col">
