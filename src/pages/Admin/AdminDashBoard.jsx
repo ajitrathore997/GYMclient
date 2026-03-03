@@ -164,8 +164,10 @@ import { BASE_URL } from "../../utils/fetchData";
 import AOS from 'aos';
 import 'aos/dist/aos.css'; // Import AOS styles
 import { BarChart } from "@mui/x-charts/BarChart";
+import { useAuth } from '../../context/auth';
 
 const AdminDashBoard = () => {
+  const { auth, setAuth } = useAuth();
   const [userCount, setUserCount] = useState(null);
   const [planCount, setPlanCount] = useState(null);
   const [subscriberCount, setSubscriberCount] = useState(null);
@@ -174,6 +176,8 @@ const AdminDashBoard = () => {
   const [loading, setLoading] = useState(false);
   const [memberStats, setMemberStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [allTimeMemberStats, setAllTimeMemberStats] = useState(null);
+  const [allTimeStatsLoading, setAllTimeStatsLoading] = useState(false);
   const [promisedMembers, setPromisedMembers] = useState([]);
   const [promisedLoading, setPromisedLoading] = useState(false);
   const [range, setRange] = useState({ startDate: "", endDate: "" });
@@ -200,6 +204,7 @@ const AdminDashBoard = () => {
     getContacts();
     getFeedbacks();
     getMemberStats(start, end);
+    getAllTimeMemberStats();
     getPromisedPendingMembers();
   }, []);
 
@@ -296,6 +301,21 @@ const AdminDashBoard = () => {
     }
   }
 
+  const getAllTimeMemberStats = async () => {
+    try {
+      setAllTimeStatsLoading(true);
+      const res = await axios.get(`${BASE_URL}/api/v1/members/dashboard`);
+      if (res.data && res.data.success) {
+        setAllTimeMemberStats(res.data.stats);
+      }
+      setAllTimeStatsLoading(false);
+    } catch (err) {
+      console.log(err);
+      toast.error("Something went wrong in getting all-time member stats");
+      setAllTimeStatsLoading(false);
+    }
+  }
+
   const getPromisedPendingMembers = async () => {
     try {
       setPromisedLoading(true);
@@ -353,6 +373,126 @@ const AdminDashBoard = () => {
     }
   };
 
+  const normalizePhone = (phone) => {
+    if (!phone) return "";
+    let digits = String(phone).replace(/[^\d]/g, "");
+    if (digits.startsWith("0")) digits = digits.slice(1);
+    if (digits.startsWith("91") && digits.length === 12) return digits;
+    if (digits.length === 10) return `91${digits}`;
+    return digits;
+  };
+
+  const openWhatsAppReminder = (member, type) => {
+  const phone = normalizePhone(member?.phone);
+  if (!phone) {
+    toast.error("Member phone number not available");
+    return;
+  }
+
+  const memberName = member?.name || "Member";
+
+  const formatDateLabel = (value) => {
+    if (!value) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const dueAmount = Number(
+    type === "next7"
+      ? (member?.totalPayableAmount ?? member?.dueAmount ?? member?.upcomingDueAmount ?? 0)
+      : (member?.dueAmount ?? member?.dueNowAmount ?? member?.remainingAmount ?? 0)
+  );
+
+  const remainingAmount = Number(member?.outstandingDueAmount ?? member?.remainingAmount ?? 0);
+  const feeAmountRaw = Number(member?.nextFeeAmount ?? member?.fee ?? 0);
+  const feeAmount = feeAmountRaw > 0 ? feeAmountRaw : Math.max(dueAmount - remainingAmount, 0);
+
+  const dueDate = formatDateLabel(member?.endDate);
+  const promiseDate = member?.effectivePromiseDate || member?.promisedPaymentDate;
+  const promiseDateLabel = formatDateLabel(promiseDate);
+
+  // Add branding in greeting
+  // const englishLines = [`Hello ${memberName},`, `This is a message from SR Fitness.`];
+  // const hindiLines = [`नमस्ते ${memberName},`, `यह संदेश SR Fitness की ओर से है।`];
+
+  const englishLines = [];
+  const hindiLines = [];
+  
+  if (type === "defaulter") {
+    englishLines.push(
+      "Your gym fee is pending.",
+      `Due Amount: Rs.${dueAmount}`,
+      `Cycle End Date: ${dueDate || "-"}`
+    );
+
+    hindiLines.push(
+      "आपकी जिम फीस बकाया है।",
+      `बकाया राशि: Rs.${dueAmount}`,
+      `साइकिल समाप्ति तिथि: ${dueDate || "-"}`
+    );
+
+    if (promiseDateLabel) {
+      englishLines.push(`Promised Date: ${promiseDateLabel}`);
+      hindiLines.push(`वादा की तिथि: ${promiseDateLabel}`);
+    }
+
+    englishLines.push("Please clear your due as soon as possible.");
+    hindiLines.push("कृपया अपनी बकाया राशि जल्द से जल्द जमा करें।");
+
+  } else if (type === "promised") {
+    englishLines.push(
+      "This is a reminder for your promised payment.",
+      `Due Amount: Rs.${dueAmount}`,
+      `Promised Date: ${promiseDateLabel || "-"}`,
+      "Please make the payment today."
+    );
+
+    hindiLines.push(
+      "यह आपके वादा किए गए भुगतान का रिमाइंडर है।",
+      `बकाया राशि: Rs.${dueAmount}`,
+      `वादा की तिथि: ${promiseDateLabel || "-"}`,
+      "कृपया आज भुगतान करें।"
+    );
+
+  } else {
+    englishLines.push("Your fee due date is approaching.");
+    hindiLines.push("आपकी फीस की देय तिथि नज़दीक है।");
+
+    if (remainingAmount > 0) {
+      englishLines.push(`Previous Due: Rs.${remainingAmount}`);
+      hindiLines.push(`पिछली बकाया राशि: Rs.${remainingAmount}`);
+    }
+
+    englishLines.push(
+      `Next Fee: Rs.${feeAmount}`,
+      `Total Payable: Rs.${dueAmount}`,
+      `Due Date: ${dueDate || "-"}`,
+      "Please pay on time to avoid interruption."
+    );
+
+    hindiLines.push(
+      `अगली फीस: Rs.${feeAmount}`,
+      `कुल देय राशि: Rs.${dueAmount}`,
+      `देय तिथि: ${dueDate || "-"}`,
+      "सेवा जारी रखने के लिए समय पर भुगतान करें।"
+    );
+  }
+
+  // Add branded closing
+  englishLines.push("\nThank you,\nTeam SR Fitness");
+  hindiLines.push("\nधन्यवाद,\nटीम SR Fitness");
+
+  const message = `${englishLines.join("\n")}\n\n${hindiLines.join("\n")}`;
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+
+  window.open(url, "_blank", "noopener,noreferrer");
+};
+
   if (loading) {
     return <Loader />
   }
@@ -361,6 +501,8 @@ const AdminDashBoard = () => {
     <section className='pt-10 bg-gray-900'>
       <Heading name="Admin Dashboard" />
       <div className="container mx-auto px-6 py-20">
+        {auth?.user?.access === 1 && (
+        <div>
         <div className="bg-gray-800 p-4 border border-white mb-8">
           <div className="flex flex-col md:flex-row gap-4 items-end">
             <div className="flex flex-col">
@@ -388,6 +530,7 @@ const AdminDashBoard = () => {
             <button
               onClick={() => {
                 getMemberStats(range.startDate, range.endDate);
+                getAllTimeMemberStats();
                 getPromisedPendingMembers();
               }}
               className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-all"
@@ -573,7 +716,7 @@ const AdminDashBoard = () => {
       xAxis={[
         {
           data: (memberStats.paymentSeries || []).map((p) =>
-            new Date(p.date).toLocaleDateString()
+            new Date(p.date).toLocaleDateString("en-GB")
           ),
           scaleType: "band",
           tickLabelStyle: {
@@ -622,7 +765,7 @@ const AdminDashBoard = () => {
                 xAxis={[
                   {
                     data: (memberStats.expenseSeries || []).map((p) =>
-                      new Date(p.date).toLocaleDateString()
+                      new Date(p.date).toLocaleDateString("en-GB")
                     ),
                     scaleType: "band",
                     tickLabelStyle: {
@@ -653,7 +796,8 @@ const AdminDashBoard = () => {
             </div>
           )}
         </div>
-
+          </div>
+        )}
         <div className="bg-gray-800 p-5 border border-white mt-10" data-aos="fade-up">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-white text-xl font-semibold">Defaulters (Top Due)</h3>
@@ -664,10 +808,10 @@ const AdminDashBoard = () => {
               View Members
             </Link>
           </div>
-          {statsLoading && <p className="text-gray-300">Loading...</p>}
-          {!statsLoading && memberStats && (
+          {allTimeStatsLoading && <p className="text-gray-300">Loading...</p>}
+          {!allTimeStatsLoading && allTimeMemberStats && (
             <>
-              {(!memberStats.defaulters || memberStats.defaulters.length === 0) ? (
+              {(!allTimeMemberStats.defaulters || allTimeMemberStats.defaulters.length === 0) ? (
                 <p className="text-gray-400">No defaulters right now.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -679,21 +823,34 @@ const AdminDashBoard = () => {
                         <th className="px-4 py-3">Due</th>
                         <th className="px-4 py-3">Cycle End</th>
                         <th className="px-4 py-3">Promised Date</th>
+                        <th className="px-4 py-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {memberStats.defaulters.map((m) => (
+                      {allTimeMemberStats.defaulters.map((m) => (
                         <tr key={m._id} className="border-b border-gray-700">
                           <td className="px-4 py-3">{m.name}</td>
                           <td className="px-4 py-3">{m.phone}</td>
                           <td className="px-4 py-3">{m.dueAmount}</td>
                           <td className="px-4 py-3">
-                            {m.endDate ? new Date(m.endDate).toLocaleDateString() : "-"}
+                            {m.endDate ? new Date(m.endDate).toLocaleDateString("en-GB") : "-"}
                           </td>
                           <td className="px-4 py-3">
                             {m.promisedPaymentDate
-                              ? new Date(m.promisedPaymentDate).toLocaleDateString()
+                              ? new Date(m.promisedPaymentDate).toLocaleDateString("en-GB", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })
                               : "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => openWhatsAppReminder(m, "defaulter")}
+                              className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                            >
+                              WhatsApp
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -731,6 +888,7 @@ const AdminDashBoard = () => {
                         <th className="px-4 py-3">Promise Date</th>
                         <th className="px-4 py-3">Due</th>
                         <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -740,7 +898,11 @@ const AdminDashBoard = () => {
                           <td className="px-4 py-3">{m.phone}</td>
                           <td className="px-4 py-3">
                             {m.effectivePromiseDate
-                              ? new Date(m.effectivePromiseDate).toLocaleDateString()
+                              ? new Date(m.effectivePromiseDate).toLocaleDateString("en-GB", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })
                               : "-"}
                           </td>
                           <td className="px-4 py-3">
@@ -748,6 +910,14 @@ const AdminDashBoard = () => {
                           </td>
                           <td className="px-4 py-3">
                             {m.displayPaymentStatus || m.paymentStatus || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => openWhatsAppReminder(m, "promised")}
+                              className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                            >
+                              WhatsApp
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -769,13 +939,13 @@ const AdminDashBoard = () => {
               View Members
             </Link>
           </div>
-          {statsLoading && <p className="text-gray-300">Loading...</p>}
-          {!statsLoading && memberStats && (
+          {allTimeStatsLoading && <p className="text-gray-300">Loading...</p>}
+          {!allTimeStatsLoading && allTimeMemberStats && (
             <>
               <p className="text-gray-300 mb-3">
-                Count: {memberStats.dueNextWeekCount}
+                Count: {allTimeMemberStats.dueNextWeekCount}
               </p>
-              {memberStats.dueNextWeekMembers.length === 0 ? (
+              {allTimeMemberStats.dueNextWeekMembers.length === 0 ? (
                 <p className="text-gray-400">No upcoming dues in the next week.</p>
               ) : (
                 <div className="overflow-x-auto">
@@ -784,18 +954,49 @@ const AdminDashBoard = () => {
                       <tr>
                         <th className="px-4 py-3">Name</th>
                         <th className="px-4 py-3">Phone</th>
+                        <th className="px-4 py-3">Fee</th>
+                        <th className="px-4 py-3">Due</th>
                         <th className="px-4 py-3">Remaining</th>
                         <th className="px-4 py-3">Due Date</th>
+                        <th className="px-4 py-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {memberStats.dueNextWeekMembers.map((m) => (
+                      {allTimeMemberStats.dueNextWeekMembers.map((m) => (
                         <tr key={m._id} className="border-b border-gray-700">
                           <td className="px-4 py-3">{m.name}</td>
                           <td className="px-4 py-3">{m.phone}</td>
-                          <td className="px-4 py-3">{m.remainingAmount}</td>
                           <td className="px-4 py-3">
-                            {new Date(m.endDate).toLocaleDateString()}
+                            {(() => {
+                              const rowRemaining = Number(m.outstandingDueAmount ?? m.remainingAmount ?? 0);
+                              const rowDue = Number(m.totalPayableAmount ?? m.dueAmount ?? m.upcomingDueAmount ?? 0);
+                              const rowFeeRaw = Number(m.nextFeeAmount ?? m.fee ?? 0);
+                              const rowFee = rowFeeRaw > 0 ? rowFeeRaw : Math.max(rowDue - rowRemaining, 0);
+                              return rowFee;
+                            })()}
+                          </td>
+                          <td className="px-4 py-3">
+                            {Number(m.totalPayableAmount ?? m.dueAmount ?? m.upcomingDueAmount ?? 0)}
+                          </td>
+                          <td className="px-4 py-3">
+                            {Number(m.outstandingDueAmount ?? m.remainingAmount ?? 0) > 0
+                              ? Number(m.outstandingDueAmount ?? m.remainingAmount ?? 0)
+                              : "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            {new Date(m.endDate).toLocaleDateString("en-GB", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => openWhatsAppReminder(m, "next7")}
+                              className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                            >
+                              WhatsApp
+                            </button>
                           </td>
                         </tr>
                       ))}

@@ -254,7 +254,14 @@ const MembersList = () => {
     if (!value) return "-";
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return "-";
-    return `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+    return `${d.toLocaleDateString("en-GB")} ${d.toLocaleTimeString("en-GB")}`;
+  };
+
+  const formatDate = (value) => {
+    if (!value) return "-";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "-";
+    return d.toLocaleDateString("en-GB");
   };
 
   const formatMonthRange = (startDate, endDate) => {
@@ -420,8 +427,7 @@ const MembersList = () => {
       `Amount: ${payment.amount ?? 0}\n` +
       `Date: ${paymentDate}\n` +
       `Received By: ${receivedBy}\n` +
-      `Outstanding: ${totalOutstanding}\n\n` +
-      `Please attach the PDF payslip in WhatsApp.`;
+      `Outstanding: ${totalOutstanding}\n\n`;
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
@@ -877,8 +883,8 @@ const MembersList = () => {
                     const cycles = Array.isArray(m.paymentCycles) ? m.paymentCycles : [];
                     const currentCycle = cycles.length ? cycles[cycles.length - 1] : null;
                     const expiryLabel = m.expiryDate
-                      ? new Date(m.expiryDate).toLocaleDateString()
-                      : (currentCycle?.endDate ? new Date(currentCycle.endDate).toLocaleDateString() : "-");
+                      ? formatDate(m.expiryDate)
+                      : formatDate(currentCycle?.endDate);
                     return (
                   <tr key={m._id} className="border-b border-gray-700">
                     <td className="px-4 py-3">
@@ -906,11 +912,11 @@ const MembersList = () => {
                     <td className="px-4 py-3">{m.displayPaymentStatus || m.paymentStatus}</td>
                     <td className="px-4 py-3">{m.memberStatus || "Active"}</td>
                     <td className="px-4 py-3">
-                      {m.registrationDate ? new Date(m.registrationDate).toLocaleDateString() : "-"}
+                      {formatDate(m.registrationDate)}
                     </td>
                     <td className="px-4 py-3">
                       {(m.activationDate || m.startDate)
-                        ? new Date(m.activationDate || m.startDate).toLocaleDateString()
+                        ? formatDate(m.activationDate || m.startDate)
                         : "-"}
                     </td>
                     <td className="px-4 py-3">{expiryLabel}</td>
@@ -1177,7 +1183,7 @@ const MembersList = () => {
                               />
                             </div>
                           ) : p.promiseDate ? (
-                            `${p.note || "-"} | Promise: ${new Date(p.promiseDate).toLocaleDateString()}`
+                            `${p.note || "-"} | Promise: ${formatDate(p.promiseDate)}`
                           ) : (
                             p.note || "-"
                           )}
@@ -1298,8 +1304,8 @@ const MembersList = () => {
                   <tbody>
                     {[...selectedMember.paymentCycles].map((c, idx) => (
                       <tr key={`${c.startDate || "cycle"}-${idx}`} className="border-b border-gray-800">
-                        <td className="px-3 py-2">{c.startDate ? new Date(c.startDate).toLocaleDateString() : "-"}</td>
-                        <td className="px-3 py-2">{c.endDate ? new Date(c.endDate).toLocaleDateString() : "-"}</td>
+                        <td className="px-3 py-2">{formatDate(c.startDate)}</td>
+                        <td className="px-3 py-2">{formatDate(c.endDate)}</td>
                         <td className="px-3 py-2">{Number(c.fee || 0)}</td>
                         <td className="px-3 py-2">{Number(c.paidAmount || 0)}</td>
                         <td className="px-3 py-2">{Number(c.remainingAmount || 0)}</td>
