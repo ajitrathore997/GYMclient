@@ -167,7 +167,7 @@ import { BarChart } from "@mui/x-charts/BarChart";
 import { useAuth } from '../../context/auth';
 
 const AdminDashBoard = () => {
-  const { auth, setAuth } = useAuth();
+  const { auth } = useAuth();
   const [userCount, setUserCount] = useState(null);
   const [planCount, setPlanCount] = useState(null);
   const [subscriberCount, setSubscriberCount] = useState(null);
@@ -373,6 +373,15 @@ const AdminDashBoard = () => {
     }
   };
 
+  const refreshDashboardData = async (startDate = range.startDate, endDate = range.endDate) => {
+    await Promise.all([
+      getMemberStats(startDate, endDate),
+      getAllTimeMemberStats(),
+      getPromisedPendingMembers(),
+    ]);
+  };
+
+
   const normalizePhone = (phone) => {
     if (!phone) return "";
     let digits = String(phone).replace(/[^\d]/g, "");
@@ -529,9 +538,7 @@ const AdminDashBoard = () => {
             </div>
             <button
               onClick={() => {
-                getMemberStats(range.startDate, range.endDate);
-                getAllTimeMemberStats();
-                getPromisedPendingMembers();
+                refreshDashboardData(range.startDate, range.endDate);
               }}
               className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-all"
             >
@@ -594,6 +601,12 @@ const AdminDashBoard = () => {
               {memberStats ? memberStats.promisedDueAmount : "Loading..."}
             </h3>
           </div>
+          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="550">
+            <p className="text-gray-300 text-sm">Active Members</p>
+            <h3 className="text-white font-bold text-3xl">
+              {memberStats ? memberStats.activeMembersCount : "Loading..."}
+            </h3>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
@@ -627,6 +640,68 @@ const AdminDashBoard = () => {
               {memberStats ? memberStats.netInRange : "Loading..."}
             </h3>
           </div>
+        </div>
+
+        <div className="bg-gray-800 p-5 border border-white mb-10" data-aos="fade-up">
+          <h3 className="text-white text-xl font-semibold mb-4">Daily Cash Closure (Today)</h3>
+          {!memberStats?.dailyClosure ? (
+            <p className="text-gray-300">Loading...</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Date</p>
+                  <p className="text-white text-lg font-semibold">
+                    {new Date(memberStats.dailyClosure.date).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Collected</p>
+                  <p className="text-green-400 text-lg font-semibold">
+                    Rs.{Number(memberStats.dailyClosure.totalCollected || 0)}
+                  </p>
+                </div>
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Expenses</p>
+                  <p className="text-red-400 text-lg font-semibold">
+                    Rs.{Number(memberStats.dailyClosure.totalExpenses || 0)}
+                  </p>
+                </div>
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Net</p>
+                  <p className={`text-lg font-semibold ${Number(memberStats.dailyClosure.net || 0) >= 0 ? "text-blue-300" : "text-orange-400"}`}>
+                    Rs.{Number(memberStats.dailyClosure.net || 0)}
+                  </p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm text-gray-200">
+                  <thead className="bg-gray-700 text-gray-100">
+                    <tr>
+                      <th className="px-4 py-3">Mode</th>
+                      <th className="px-4 py-3">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(memberStats.dailyClosure.collectedByMode || {}).map(([mode, amount]) => (
+                      <tr key={mode} className="border-b border-gray-700">
+                        <td className="px-4 py-3">{mode}</td>
+                        <td className="px-4 py-3">Rs.{Number(amount || 0)}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-gray-900/70">
+                      <td className="px-4 py-3 font-semibold">Payments Count</td>
+                      <td className="px-4 py-3 font-semibold">{Number(memberStats.dailyClosure.totalPaymentsCount || 0)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
 
         {/* <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-stretch">
@@ -823,7 +898,7 @@ const AdminDashBoard = () => {
                         <th className="px-4 py-3">Due</th>
                         <th className="px-4 py-3">Cycle End</th>
                         <th className="px-4 py-3">Promised Date</th>
-                        <th className="px-4 py-3 text-right">Action</th>
+                        <th className="px-4 py-3 text-center w-40">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -844,10 +919,10 @@ const AdminDashBoard = () => {
                                 })
                               : "-"}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => openWhatsAppReminder(m, "defaulter")}
-                              className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                              className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
                             >
                               WhatsApp
                             </button>
@@ -888,7 +963,7 @@ const AdminDashBoard = () => {
                         <th className="px-4 py-3">Promise Date</th>
                         <th className="px-4 py-3">Due</th>
                         <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3 text-right">Action</th>
+                        <th className="px-4 py-3 text-center w-40">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -911,10 +986,10 @@ const AdminDashBoard = () => {
                           <td className="px-4 py-3">
                             {m.displayPaymentStatus || m.paymentStatus || "-"}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => openWhatsAppReminder(m, "promised")}
-                              className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                              className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
                             >
                               WhatsApp
                             </button>
@@ -958,7 +1033,7 @@ const AdminDashBoard = () => {
                         <th className="px-4 py-3">Due</th>
                         <th className="px-4 py-3">Remaining</th>
                         <th className="px-4 py-3">Due Date</th>
-                        <th className="px-4 py-3 text-right">Action</th>
+                        <th className="px-4 py-3 text-center w-40">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -990,10 +1065,10 @@ const AdminDashBoard = () => {
                               year: "numeric",
                             })}
                           </td>
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => openWhatsAppReminder(m, "next7")}
-                              className="px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                              className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
                             >
                               WhatsApp
                             </button>

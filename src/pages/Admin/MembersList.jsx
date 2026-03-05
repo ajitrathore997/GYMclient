@@ -30,6 +30,9 @@ const MembersList = () => {
   const [editStatus, setEditStatus] = useState("Paid");
   const [isPayOpen, setIsPayOpen] = useState(false);
   const [payMember, setPayMember] = useState(null);
+  const [isMember360Open, setIsMember360Open] = useState(false);
+  const [member360Loading, setMember360Loading] = useState(false);
+  const [member360Data, setMember360Data] = useState(null);
   const [payAmount, setPayAmount] = useState("");
   const [payNote, setPayNote] = useState("");
   const [payDate, setPayDate] = useState("");
@@ -170,6 +173,118 @@ const MembersList = () => {
     return Number(member.fee || 0);
   };
 
+  const getExpectedFeeForMonth = (member, monthLabel) => {
+    if (!member || !monthLabel) return Number(member?.fee || 0);
+    const target = parseMonthLabel(monthLabel);
+    if (!target) return Number(member?.fee || 0);
+    const cycles = Array.isArray(member.paymentCycles) ? member.paymentCycles : [];
+    const cycle = cycles.find((c) => {
+      const s = c?.startDate ? new Date(c.startDate) : null;
+      const e = c?.endDate ? new Date(c.endDate) : null;
+      if (!s || !e || Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return false;
+      const startMonth = new Date(s.getFullYear(), s.getMonth(), 1);
+      const endMonth = new Date(e.getFullYear(), e.getMonth(), 1);
+      return target >= startMonth && target < endMonth;
+    });
+    return Number(cycle?.fee ?? member?.fee ?? 0);
+  };
+
+  const getMonthPaymentSummary = (member, monthLabel) => {
+    const expectedFee = Number(getExpectedFeeForMonth(member, monthLabel) || 0);
+    const history = Array.isArray(member?.paymentHistory) ? member.paymentHistory : [];
+    let paid = 0;
+    let adjustments = 0;
+
+    const getEntryMonthLabel = (entry) => {
+      if (entry?.paymentMonth) return entry.paymentMonth;
+      if (entry?.at) {
+        const d = new Date(entry.at);
+        if (!Number.isNaN(d.getTime())) {
+          return d.toLocaleString(undefined, { month: "long", year: "numeric" });
+        }
+      }
+      return "";
+    };
+
+    for (const entry of history) {
+      if (getEntryMonthLabel(entry) !== monthLabel) continue;
+      const amount = Number(entry?.amount || 0);
+      if (entry?.type === "adjustment") adjustments += amount;
+      if (entry?.type === "payment") paid += amount;
+    }
+
+    const settled = paid + adjustments;
+    const balance = Math.max(expectedFee - settled, 0);
+    return { expectedFee, paid, adjustments, settled, balance };
+  };
+
+  const buildMemberLedger = (member) => {
+    if (!member) return [];
+    const monthSet = new Set();
+    const activation = member?.activationDate || member?.startDate || member?.registrationDate || member?.createdAt;
+    if (activation) {
+      const d = new Date(activation);
+      if (!Number.isNaN(d.getTime())) {
+        const start = new Date(d.getFullYear(), d.getMonth(), 1);
+        const end = new Date();
+        end.setMonth(end.getMonth() + 1);
+        const cursor = new Date(start);
+        while (cursor <= end) {
+          monthSet.add(formatMonthLabel(cursor));
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+      }
+    }
+
+    const cycles = Array.isArray(member.paymentCycles) ? member.paymentCycles : [];
+    for (const c of cycles) {
+      const s = c?.startDate ? new Date(c.startDate) : null;
+      const e = c?.endDate ? new Date(c.endDate) : null;
+      if (!s || !e || Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) continue;
+      const cursor = new Date(s.getFullYear(), s.getMonth(), 1);
+      const endMonth = new Date(e.getFullYear(), e.getMonth(), 1);
+      while (cursor < endMonth) {
+        monthSet.add(formatMonthLabel(cursor));
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+    }
+
+    const history = Array.isArray(member.paymentHistory) ? member.paymentHistory : [];
+    for (const p of history) {
+      if (p?.paymentMonth) monthSet.add(p.paymentMonth);
+      else if (p?.at) {
+        const d = new Date(p.at);
+        if (!Number.isNaN(d.getTime())) {
+          monthSet.add(formatMonthLabel(new Date(d.getFullYear(), d.getMonth(), 1)));
+        }
+      }
+    }
+
+    const months = [...monthSet]
+      .map((label) => ({ label, date: parseMonthLabel(label) }))
+      .filter((x) => x.date)
+      .sort((a, b) => a.date - b.date)
+      .map((x) => x.label);
+
+    const ledger = [];
+    let carryDue = 0;
+    for (const month of months) {
+      const summary = getMonthPaymentSummary(member, month);
+      const dueBefore = Number(summary.expectedFee || 0) + Number(carryDue || 0);
+      const settled = Number(summary.paid || 0) + Number(summary.adjustments || 0);
+      carryDue = Math.max(dueBefore - settled, 0);
+      ledger.push({
+        month,
+        fee: Number(summary.expectedFee || 0),
+        paid: Number(summary.paid || 0),
+        adjustment: Number(summary.adjustments || 0),
+        carryDue,
+        status: carryDue <= 0 ? "Paid" : "Pending",
+      });
+    }
+    return ledger;
+  };
+
   const handleFilterChange = (e) => {
     const { id, value } = e.target;
     setPage(1);
@@ -248,6 +363,31 @@ const MembersList = () => {
     setPayMode("Cash");
     setPromiseDate("");
     setPayMonthOptions([]);
+  };
+
+  const openMember360 = async (member) => {
+    if (!member?._id) return;
+    setIsMember360Open(true);
+    setMember360Loading(true);
+    setMember360Data(null);
+    try {
+      const res = await axios.get(`${BASE_URL}/api/v1/members/${member._id}`);
+      if (res.data?.success && res.data?.member) {
+        setMember360Data(res.data.member);
+      } else {
+        toast.error(res.data?.message || "Failed to load member details");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to load member details");
+    } finally {
+      setMember360Loading(false);
+    }
+  };
+
+  const closeMember360 = () => {
+    setIsMember360Open(false);
+    setMember360Loading(false);
+    setMember360Data(null);
   };
 
   const formatDateTime = (value) => {
@@ -578,9 +718,14 @@ const MembersList = () => {
   const submitPayment = async (e) => {
     e.preventDefault();
     if (!payMember?._id) return;
+    const monthSummary = getMonthPaymentSummary(payMember, payMonth);
     const monthCycleDue = getSelectedMonthCycleDue(payMember, payMonth);
     const dueAmount = Number(
-      monthCycleDue ?? payMember?.dueNowAmount ?? payMember?.remainingAmount ?? 0
+      monthSummary?.balance ??
+      monthCycleDue ??
+      payMember?.dueNowAmount ??
+      payMember?.remainingAmount ??
+      0
     );
     const enteredAmount = Number(payAmount || 0);
     const needsPromiseDate = enteredAmount > 0 && enteredAmount < dueAmount;
@@ -625,6 +770,13 @@ const MembersList = () => {
       toast.error(err.response?.data?.message || "Failed to update member status");
     }
   };
+
+  const payMonthSummary = getMonthPaymentSummary(payMember, payMonth);
+  const payBalanceAfter = Math.max(
+    Number(payMonthSummary?.balance || 0) - Number(payAmount || 0),
+    0
+  );
+  const memberLedger = buildMemberLedger(selectedMember);
 
   return (
     <section className="py-16 bg-gray-900 min-h-screen">
@@ -922,52 +1074,60 @@ const MembersList = () => {
                     <td className="px-4 py-3">{expiryLabel}</td>
                     <td className="px-4 py-3">{m.lastPaymentMonth || "-"}</td>
                     <td className="px-4 py-3">{lastPaymentLabel}</td>
-                    <td className="px-4 py-3 text-right space-x-2">
-                      <Link
-                        to={`/dashboard/admin/members/${m._id}`}
-                        className="inline-block px-3 py-1 rounded bg-yellow-500 text-black hover:bg-yellow-400 transition-all"
-                      >
-                        Edit
-                      </Link>
-                      <button
-                        onClick={() => openPay(m)}
-                        className="inline-block px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
-                      >
-                        Pay
-                      </button>
-                      <button
-                        onClick={() => openHistory(m)}
-                        className="inline-block px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-500 transition-all"
-                      >
-                        History
-                      </button>
-                      <button
-                        onClick={() => openCycles(m)}
-                        className="inline-block px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500 transition-all"
-                      >
-                        Cycles
-                      </button>
-                      {m.memberStatus === "Inactive" ? (
-                        <button
-                          onClick={() => updateMemberStatus(m, "Active")}
-                          className="inline-block px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-500 transition-all"
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Link
+                          to={`/dashboard/admin/members/${m._id}`}
+                          className="inline-flex items-center justify-center px-3 py-1 rounded bg-yellow-500 text-black hover:bg-yellow-400 transition-all"
                         >
-                          Mark Active
-                        </button>
-                      ) : (
+                          Edit
+                        </Link>
                         <button
-                          onClick={() => updateMemberStatus(m, "Inactive")}
-                          className="inline-block px-3 py-1 rounded bg-orange-600 text-white hover:bg-orange-500 transition-all"
+                          onClick={() => openMember360(m)}
+                          className="inline-flex items-center justify-center px-3 py-1 rounded bg-cyan-700 text-white hover:bg-cyan-600 transition-all"
                         >
-                          Mark Inactive
+                          360
                         </button>
-                      )}
-                      <button
-                        onClick={() => handleDelete(m._id)}
-                        className="inline-block px-3 py-1 rounded bg-red-600 text-white hover:bg-red-500 transition-all"
-                      >
-                        Delete
-                      </button>
+                        <button
+                          onClick={() => openPay(m)}
+                          className="inline-flex items-center justify-center px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                        >
+                          Pay
+                        </button>
+                        <button
+                          onClick={() => openHistory(m)}
+                          className="inline-flex items-center justify-center px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-500 transition-all"
+                        >
+                          History
+                        </button>
+                        <button
+                          onClick={() => openCycles(m)}
+                          className="inline-flex items-center justify-center px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500 transition-all"
+                        >
+                          Cycles
+                        </button>
+                        {m.memberStatus === "Inactive" ? (
+                          <button
+                            onClick={() => updateMemberStatus(m, "Active")}
+                            className="inline-flex items-center justify-center px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-500 transition-all"
+                          >
+                            Mark Active
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => updateMemberStatus(m, "Inactive")}
+                            className="inline-flex items-center justify-center px-3 py-1 rounded bg-orange-600 text-white hover:bg-orange-500 transition-all"
+                          >
+                            Mark Inactive
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(m._id)}
+                          className="inline-flex items-center justify-center px-3 py-1 rounded bg-red-600 text-white hover:bg-red-500 transition-all"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                     );
@@ -1031,6 +1191,42 @@ const MembersList = () => {
               </button>
             </div>
             <div className="p-5 max-h-[70vh] overflow-y-auto">
+              <div className="mb-4 p-3 rounded border border-gray-700 bg-gray-800/60">
+                <div className="text-sm font-semibold text-white mb-2">Member Ledger (Month-wise)</div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-xs text-gray-200">
+                    <thead className="bg-gray-800 text-gray-100">
+                      <tr>
+                        <th className="px-2 py-2">Month</th>
+                        <th className="px-2 py-2">Month Fee</th>
+                        <th className="px-2 py-2">Paid</th>
+                        <th className="px-2 py-2">Adjustment</th>
+                        <th className="px-2 py-2">Carry Due</th>
+                        <th className="px-2 py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {memberLedger.slice(-18).map((row) => (
+                        <tr key={row.month} className="border-b border-gray-800">
+                          <td className="px-2 py-2">{row.month}</td>
+                          <td className="px-2 py-2">{row.fee}</td>
+                          <td className="px-2 py-2">{row.paid}</td>
+                          <td className="px-2 py-2">{row.adjustment}</td>
+                          <td className="px-2 py-2">{row.carryDue}</td>
+                          <td className="px-2 py-2">{row.status}</td>
+                        </tr>
+                      ))}
+                      {memberLedger.length === 0 && (
+                        <tr>
+                          <td className="px-2 py-2 text-gray-400" colSpan={6}>
+                            No ledger data
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
               <div className="mb-4 p-3 rounded border border-gray-700 bg-gray-800/60">
                 <div className="text-sm font-semibold text-white mb-2">Manual Adjustment</div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
@@ -1337,12 +1533,19 @@ const MembersList = () => {
             </div>
             <form onSubmit={submitPayment} className="p-5 space-y-4">
               <div className="text-xs text-gray-300">
-                Current Due: Rs.{Number(
-                  getSelectedMonthCycleDue(payMember, payMonth) ??
-                    payMember?.dueNowAmount ??
-                    payMember?.remainingAmount ??
-                    0
-                )}
+                Current Due: Rs.{Number(payMonthSummary?.balance || 0)}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs text-gray-300 bg-gray-800/50 border border-gray-700 rounded p-2">
+                <div>Expected Fee ({payMonth || "-"})</div>
+                <div className="text-right">Rs.{Number(payMonthSummary?.expectedFee || 0)}</div>
+                <div>Already Paid</div>
+                <div className="text-right">Rs.{Number(payMonthSummary?.paid || 0)}</div>
+                <div>Adjustments</div>
+                <div className="text-right">Rs.{Number(payMonthSummary?.adjustments || 0)}</div>
+                <div>Balance Before Payment</div>
+                <div className="text-right">Rs.{Number(payMonthSummary?.balance || 0)}</div>
+                <div>Balance After This Payment</div>
+                <div className="text-right">Rs.{payBalanceAfter}</div>
               </div>
               <div className="flex flex-col">
                 <label className="text-sm text-gray-300 mb-1">Amount</label>
@@ -1366,10 +1569,7 @@ const MembersList = () => {
               </div>
               {Number(payAmount || 0) > 0 &&
                 Number(payAmount || 0) < Number(
-                  getSelectedMonthCycleDue(payMember, payMonth) ??
-                    payMember?.dueNowAmount ??
-                    payMember?.remainingAmount ??
-                    0
+                  payMonthSummary?.balance || 0
                 ) && (
                   <div className="flex flex-col">
                     <label className="text-sm text-gray-300 mb-1">
@@ -1431,6 +1631,184 @@ const MembersList = () => {
                 Submit Payment
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isMember360Open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-gray-900 text-gray-100 w-full max-w-5xl rounded-lg shadow-lg">
+            <div className="flex items-center justify-between border-b border-gray-700 px-5 py-4">
+              <div className="text-lg font-semibold">
+                Member 360 {member360Data?.name ? `• ${member360Data.name}` : ""}
+              </div>
+              <button
+                onClick={closeMember360}
+                className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition-all"
+              >
+                Close
+              </button>
+            </div>
+            <div className="p-5 max-h-[75vh] overflow-y-auto">
+              {member360Loading && <div className="text-gray-300">Loading...</div>}
+              {!member360Loading && !member360Data && (
+                <div className="text-gray-300">No data found.</div>
+              )}
+              {!member360Loading && member360Data && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+                    <div className="p-3 bg-gray-800 rounded border border-gray-700">
+                      <div className="text-xs text-gray-400">Member Status</div>
+                      <div className="text-lg font-semibold">{member360Data.memberStatus || "-"}</div>
+                    </div>
+                    <div className="p-3 bg-gray-800 rounded border border-gray-700">
+                      <div className="text-xs text-gray-400">Payment Status</div>
+                      <div className="text-lg font-semibold">{member360Data.displayPaymentStatus || member360Data.paymentStatus || "-"}</div>
+                    </div>
+                    <div className="p-3 bg-gray-800 rounded border border-gray-700">
+                      <div className="text-xs text-gray-400">Total Due</div>
+                      <div className="text-lg font-semibold">Rs.{Number(member360Data.dueNowAmount ?? member360Data.remainingAmount ?? 0)}</div>
+                    </div>
+                    <div className="p-3 bg-gray-800 rounded border border-gray-700">
+                      <div className="text-xs text-gray-400">Current Fee</div>
+                      <div className="text-lg font-semibold">Rs.{Number(member360Data.fee || 0)}</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                    <div className="p-4 bg-gray-800 rounded border border-gray-700">
+                      <div className="text-sm font-semibold mb-2">Profile</div>
+                      <div className="text-sm text-gray-300">Phone: {member360Data.phone || "-"}</div>
+                      <div className="text-sm text-gray-300">Email: {member360Data.email || "-"}</div>
+                      <div className="text-sm text-gray-300">Plan: {member360Data.membershipType || "-"}</div>
+                      <div className="text-sm text-gray-300">Registration: {formatDate(member360Data.registrationDate)}</div>
+                      <div className="text-sm text-gray-300">Activation: {formatDate(member360Data.activationDate || member360Data.startDate)}</div>
+                      <div className="text-sm text-gray-300">Reminder: {member360Data.reminderStatus || "None"}</div>
+                      <div className="text-sm text-gray-300">
+                        Promised Date: {member360Data.promisedPaymentDate ? formatDate(member360Data.promisedPaymentDate) : "-"}
+                      </div>
+                    </div>
+                    <div className="p-4 bg-gray-800 rounded border border-gray-700">
+                      <div className="text-sm font-semibold mb-2">Current Cycle</div>
+                      {(() => {
+                        const cycles = Array.isArray(member360Data.paymentCycles) ? member360Data.paymentCycles : [];
+                        const currentCycle = cycles.length ? cycles[cycles.length - 1] : null;
+                        if (!currentCycle) return <div className="text-sm text-gray-300">No cycle found.</div>;
+                        return (
+                          <>
+                            <div className="text-sm text-gray-300">Start: {formatDate(currentCycle.startDate)}</div>
+                            <div className="text-sm text-gray-300">End: {formatDate(currentCycle.endDate)}</div>
+                            <div className="text-sm text-gray-300">Fee: Rs.{Number(currentCycle.fee || 0)}</div>
+                            <div className="text-sm text-gray-300">Paid: Rs.{Number(currentCycle.paidAmount || 0)}</div>
+                            <div className="text-sm text-gray-300">Due: Rs.{Number(currentCycle.remainingAmount || 0)}</div>
+                            <div className="text-sm text-gray-300">Status: {currentCycle.status || "-"}</div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  <div className="mb-5">
+                    <div className="text-sm font-semibold mb-2">Recent Payments</div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-left text-sm text-gray-200">
+                        <thead className="bg-gray-800 text-gray-100">
+                          <tr>
+                            <th className="px-3 py-2">Amount</th>
+                            <th className="px-3 py-2">Month</th>
+                            <th className="px-3 py-2">Mode</th>
+                            <th className="px-3 py-2">Date</th>
+                            <th className="px-3 py-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(Array.isArray(member360Data.paymentHistory) ? [...member360Data.paymentHistory].reverse().slice(0, 8) : []).map((p, idx) => (
+                            <tr key={`${p.at || "p"}-${idx}`} className="border-b border-gray-800">
+                              <td className="px-3 py-2">{Number(p.amount || 0)}</td>
+                              <td className="px-3 py-2">{p.paymentMonth || "-"}</td>
+                              <td className="px-3 py-2">{p.paymentMode || "-"}</td>
+                              <td className="px-3 py-2">{formatDateTime(p.at)}</td>
+                              <td className="px-3 py-2">{p.paymentStatus || "-"}</td>
+                            </tr>
+                          ))}
+                          {(!Array.isArray(member360Data.paymentHistory) || member360Data.paymentHistory.length === 0) && (
+                            <tr>
+                              <td className="px-3 py-2 text-gray-400" colSpan={5}>No payment history</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="mb-5">
+                    <div className="text-sm font-semibold mb-2">Recent Cycles</div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-left text-sm text-gray-200">
+                        <thead className="bg-gray-800 text-gray-100">
+                          <tr>
+                            <th className="px-3 py-2">Start</th>
+                            <th className="px-3 py-2">End</th>
+                            <th className="px-3 py-2">Fee</th>
+                            <th className="px-3 py-2">Paid</th>
+                            <th className="px-3 py-2">Due</th>
+                            <th className="px-3 py-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(Array.isArray(member360Data.paymentCycles) ? [...member360Data.paymentCycles].reverse().slice(0, 6) : []).map((c, idx) => (
+                            <tr key={`${c.startDate || "c"}-${idx}`} className="border-b border-gray-800">
+                              <td className="px-3 py-2">{formatDate(c.startDate)}</td>
+                              <td className="px-3 py-2">{formatDate(c.endDate)}</td>
+                              <td className="px-3 py-2">{Number(c.fee || 0)}</td>
+                              <td className="px-3 py-2">{Number(c.paidAmount || 0)}</td>
+                              <td className="px-3 py-2">{Number(c.remainingAmount || 0)}</td>
+                              <td className="px-3 py-2">{c.status || "-"}</td>
+                            </tr>
+                          ))}
+                          {(!Array.isArray(member360Data.paymentCycles) || member360Data.paymentCycles.length === 0) && (
+                            <tr>
+                              <td className="px-3 py-2 text-gray-400" colSpan={6}>No cycle history</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-sm font-semibold mb-2">Recent Activity</div>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-left text-sm text-gray-200">
+                        <thead className="bg-gray-800 text-gray-100">
+                          <tr>
+                            <th className="px-3 py-2">Time</th>
+                            <th className="px-3 py-2">Action</th>
+                            <th className="px-3 py-2">Note</th>
+                            <th className="px-3 py-2">By</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(Array.isArray(member360Data.activityHistory) ? [...member360Data.activityHistory].reverse().slice(0, 10) : []).map((a, idx) => (
+                            <tr key={`${a.at || "a"}-${idx}`} className="border-b border-gray-800">
+                              <td className="px-3 py-2">{formatDateTime(a.at)}</td>
+                              <td className="px-3 py-2">{a.action || "-"}</td>
+                              <td className="px-3 py-2">{a.note || "-"}</td>
+                              <td className="px-3 py-2">{a.by?.name || "-"}</td>
+                            </tr>
+                          ))}
+                          {(!Array.isArray(member360Data.activityHistory) || member360Data.activityHistory.length === 0) && (
+                            <tr>
+                              <td className="px-3 py-2 text-gray-400" colSpan={4}>No activity history</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
