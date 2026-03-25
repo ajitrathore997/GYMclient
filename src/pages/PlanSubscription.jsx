@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import {toast} from 'react-hot-toast';
-import { Input, ButtonOutline, Loader } from '../components';
+import { Input, ButtonOutline, Loader, LoadingButton } from '../components';
 import { useAuth } from '../context/auth';
 import { FiArrowUpRight } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
@@ -19,6 +19,7 @@ const PlanSelection = () => {
   const [planType, setPlanType] = useState("");
   const [planId, setPlanId] = useState(planid);
 const [loading, setLoading] = useState(false);
+const [submitting, setSubmitting] = useState(false);
 
   const getPlan = async () => {
     try {
@@ -116,6 +117,7 @@ const [loading, setLoading] = useState(false);
 
 
     try {
+      setSubmitting(true);
     
 
       const res = await axios.post(`${BASE_URL}/api/v1/subscription/create-subscription`, {
@@ -138,7 +140,8 @@ const [loading, setLoading] = useState(false);
   } catch (error) {
     console.error(error);
     toast.error("Something went wrong while creating subscription");
-   
+  } finally {
+    setSubmitting(false);
   }
 
   }
@@ -215,7 +218,14 @@ const [loading, setLoading] = useState(false);
             disabled // Disable user input for plan amount
           />
 
-          <button type='submit' className='btn px-5 py-2 font-normal outline-none border border-white rounded-sm text-xl text-white hover:text-black hover:bg-white transition-all ease-in w-full max-w-[750px]'>Submit</button>
+          <LoadingButton
+            type='submit'
+            loading={submitting}
+            loadingText="Submitting..."
+            className='btn px-5 py-2 font-normal outline-none border border-white rounded-sm text-xl text-white hover:text-black hover:bg-white transition-all ease-in w-full max-w-[750px]'
+          >
+            Submit
+          </LoadingButton>
         </form>
       </div>
 

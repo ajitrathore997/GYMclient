@@ -33,6 +33,7 @@ const MembersList = () => {
   const [isMember360Open, setIsMember360Open] = useState(false);
   const [member360Loading, setMember360Loading] = useState(false);
   const [member360Data, setMember360Data] = useState(null);
+  const [member360TargetId, setMember360TargetId] = useState("");
   const [payAmount, setPayAmount] = useState("");
   const [payNote, setPayNote] = useState("");
   const [payDate, setPayDate] = useState("");
@@ -41,6 +42,9 @@ const MembersList = () => {
   const [promiseDate, setPromiseDate] = useState("");
   const [payMonthOptions, setPayMonthOptions] = useState([]);
   const [listType, setListType] = useState("all");
+  const [deletingMemberId, setDeletingMemberId] = useState("");
+  const [statusUpdatingId, setStatusUpdatingId] = useState("");
+  const [submittingPayment, setSubmittingPayment] = useState(false);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -87,6 +91,7 @@ const MembersList = () => {
 
   const handleDelete = async (memberId) => {
     if (!window.confirm("Delete this member?")) return;
+    setDeletingMemberId(memberId);
     try {
       const res = await axios.delete(`${BASE_URL}/api/v1/members/${memberId}`);
       if (res.data?.success) {
@@ -97,6 +102,8 @@ const MembersList = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete member");
+    } finally {
+      setDeletingMemberId("");
     }
   };
 
@@ -218,10 +225,17 @@ const MembersList = () => {
     return { expectedFee, paid, adjustments, settled, balance };
   };
 
+  const getMemberOutstanding = (member) =>
+    Number(
+      member?.dueNowAmount ??
+        member?.remainingAmount ??
+        Math.max((member?.fee || 0) - (member?.paidAmount || 0), 0)
+    );
+
   const buildMemberLedger = (member) => {
     if (!member) return [];
     const monthSet = new Set();
-    const activation = member?.activationDate || member?.startDate || member?.registrationDate || member?.createdAt;
+    const activation = member?.activationDate || member?.startDate || member?.createdAt;
     if (activation) {
       const d = new Date(activation);
       if (!Number.isNaN(d.getTime())) {
@@ -285,6 +299,44 @@ const MembersList = () => {
     return ledger;
   };
 
+  const getPayTargetMonth = (member, options = []) => {
+    const ledger = buildMemberLedger(member);
+    const oldestPendingMonth = ledger.find((entry) => Number(entry.carryDue || 0) > 0)?.month;
+    if (oldestPendingMonth) return oldestPendingMonth;
+
+    const currentMonth = new Date().toLocaleString(undefined, {
+      month: "long",
+      year: "numeric",
+    });
+    if (options.includes(currentMonth)) return currentMonth;
+    return options[options.length - 1] || "";
+  };
+
+  const getSelectedMonthPaymentContext = (member, monthLabel) => {
+    const ledger = buildMemberLedger(member);
+    const monthIndex = ledger.findIndex((entry) => entry.month === monthLabel);
+    const summary = getMonthPaymentSummary(member, monthLabel);
+
+    if (monthIndex < 0) {
+      return {
+        previousDue: 0,
+        selectedMonthDue: Number(summary?.balance || 0),
+        totalThroughSelectedMonth: Number(summary?.balance || 0),
+        oldestPendingMonth: ledger.find((entry) => Number(entry.carryDue || 0) > 0)?.month || "",
+      };
+    }
+
+    const previousDue = monthIndex > 0 ? Number(ledger[monthIndex - 1]?.carryDue || 0) : 0;
+    const totalThroughSelectedMonth = Number(ledger[monthIndex]?.carryDue || 0);
+
+    return {
+      previousDue,
+      selectedMonthDue: Number(summary?.balance || 0),
+      totalThroughSelectedMonth,
+      oldestPendingMonth: ledger.find((entry) => Number(entry.carryDue || 0) > 0)?.month || "",
+    };
+  };
+
   const handleFilterChange = (e) => {
     const { id, value } = e.target;
     setPage(1);
@@ -335,9 +387,7 @@ const MembersList = () => {
     setPayDate(today);
     const options = buildMonthOptionsForMember(member);
     setPayMonthOptions(options);
-    setPayMonth(options.includes(new Date().toLocaleString(undefined, { month: "long", year: "numeric" }))
-      ? new Date().toLocaleString(undefined, { month: "long", year: "numeric" })
-      : (options[options.length - 1] || ""));
+    setPayMonth(getPayTargetMonth(member, options));
     setPayMode("Cash");
     setPromiseDate("");
     setIsPayOpen(true);
@@ -369,11 +419,28 @@ const MembersList = () => {
     if (!member?._id) return;
     setIsMember360Open(true);
     setMember360Loading(true);
+    setMember360TargetId(member._id);
     setMember360Data(null);
     try {
       const res = await axios.get(`${BASE_URL}/api/v1/members/${member._id}`);
       if (res.data?.success && res.data?.member) {
-        setMember360Data(res.data.member);
+        const dueNowAmount = Number(res.data?.dueNowAmount ?? 0);
+        const displayPaymentStatus =
+          dueNowAmount > 0
+            ? "Pending"
+            : res.data.member?.paymentStatus === "Free Trial" &&
+              Number(res.data.member?.fee || 0) === 0
+            ? "Free Trial"
+            : "Paid";
+        setMember360Data({
+          ...res.data.member,
+          dueNowAmount,
+          currentCycle: res.data?.currentCycle || null,
+          totalOutstanding: Number(res.data?.totalOutstanding || 0),
+          expiryDate: res.data?.expiryDate || null,
+          isExpired: Boolean(res.data?.isExpired),
+          displayPaymentStatus,
+        });
       } else {
         toast.error(res.data?.message || "Failed to load member details");
       }
@@ -381,12 +448,14 @@ const MembersList = () => {
       toast.error(err.response?.data?.message || "Failed to load member details");
     } finally {
       setMember360Loading(false);
+      setMember360TargetId("");
     }
   };
 
   const closeMember360 = () => {
     setIsMember360Open(false);
     setMember360Loading(false);
+    setMember360TargetId("");
     setMember360Data(null);
   };
 
@@ -465,7 +534,7 @@ const MembersList = () => {
   const cycles = Array.isArray(member.paymentCycles) ? member.paymentCycles : [];
   const currentCycle = cycles.length ? cycles[cycles.length - 1] : null;
 
-  const totalOutstanding = Number(member.remainingAmount || 0);
+  const totalOutstanding = getMemberOutstanding(member);
   const currentRemaining = currentCycle
     ? Number(currentCycle.remainingAmount || 0)
     : 0;
@@ -559,7 +628,7 @@ const MembersList = () => {
     const cycleLabel = payment.paymentMonth || formatAllocationRanges(payment.allocations);
     const paymentDate = formatDateTime(payment.at);
     const receivedBy = payment.by?.name || "Unknown";
-    const totalOutstanding = Number(member.remainingAmount || 0);
+    const totalOutstanding = getMemberOutstanding(member);
     const message =
       `Payment Receipt\n` +
       `Member: ${member.name || "-"}\n` +
@@ -729,6 +798,7 @@ const MembersList = () => {
     );
     const enteredAmount = Number(payAmount || 0);
     const needsPromiseDate = enteredAmount > 0 && enteredAmount < dueAmount;
+    setSubmittingPayment(true);
     try {
       const payload = {
         amount: enteredAmount,
@@ -751,11 +821,14 @@ const MembersList = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to add payment");
+    } finally {
+      setSubmittingPayment(false);
     }
   };
 
   const updateMemberStatus = async (member, nextStatus) => {
     if (!member?._id) return;
+    setStatusUpdatingId(member._id);
     try {
       const res = await axios.put(`${BASE_URL}/api/v1/members/${member._id}/status`, {
         memberStatus: nextStatus,
@@ -768,10 +841,14 @@ const MembersList = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to update member status");
+    } finally {
+      setStatusUpdatingId("");
     }
   };
 
   const payMonthSummary = getMonthPaymentSummary(payMember, payMonth);
+  const payMemberOutstanding = getMemberOutstanding(payMember);
+  const payMonthContext = getSelectedMonthPaymentContext(payMember, payMonth);
   const payBalanceAfter = Math.max(
     Number(payMonthSummary?.balance || 0) - Number(payAmount || 0),
     0
@@ -954,13 +1031,12 @@ const MembersList = () => {
               onChange={handleFilterChange}
               className="p-2 rounded-md outline-none w-full"
             >
-              <option value="createdAt">Sort By (Created)</option>
+              <option value="createdAt">Joined Date</option>
               <option value="name">Name</option>
               <option value="fee">Fee</option>
               <option value="paidAmount">Paid</option>
-              <option value="remainingAmount">Remaining</option>
+              <option value="remainingAmount">Outstanding</option>
               <option value="activationDate">Activation Date</option>
-              <option value="registrationDate">Registration Date</option>
             </select>
             <select
               id="sortOrder"
@@ -1006,7 +1082,7 @@ const MembersList = () => {
                   <th className="px-4 py-3">Remaining</th>
                   <th className="px-4 py-3">Payment</th>
                   <th className="px-4 py-3">Member</th>
-                  <th className="px-4 py-3">Registration</th>
+                  <th className="px-4 py-3">Joined</th>
                   <th className="px-4 py-3">Activation</th>
                   <th className="px-4 py-3">Expiry</th>
                   <th className="px-4 py-3">Last Month</th>
@@ -1059,12 +1135,12 @@ const MembersList = () => {
                     <td className="px-4 py-3">{m.fee ?? 0}</td>
                     <td className="px-4 py-3">{m.paidAmount ?? 0}</td>
                     <td className="px-4 py-3">
-                      {m.dueNowAmount ?? m.remainingAmount ?? Math.max((m.fee || 0) - (m.paidAmount || 0), 0)}
+                      {getMemberOutstanding(m)}
                     </td>
                     <td className="px-4 py-3">{m.displayPaymentStatus || m.paymentStatus}</td>
                     <td className="px-4 py-3">{m.memberStatus || "Active"}</td>
                     <td className="px-4 py-3">
-                      {formatDate(m.registrationDate)}
+                      {formatDate(m.joinedDate || m.createdAt)}
                     </td>
                     <td className="px-4 py-3">
                       {(m.activationDate || m.startDate)
@@ -1084,9 +1160,10 @@ const MembersList = () => {
                         </Link>
                         <button
                           onClick={() => openMember360(m)}
-                          className="inline-flex items-center justify-center px-3 py-1 rounded bg-cyan-700 text-white hover:bg-cyan-600 transition-all"
+                          disabled={member360TargetId === m._id}
+                          className="inline-flex items-center justify-center px-3 py-1 rounded bg-cyan-700 text-white hover:bg-cyan-600 transition-all disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          360
+                          {member360TargetId === m._id ? "Loading..." : "360"}
                         </button>
                         <button
                           onClick={() => openPay(m)}
@@ -1109,23 +1186,26 @@ const MembersList = () => {
                         {m.memberStatus === "Inactive" ? (
                           <button
                             onClick={() => updateMemberStatus(m, "Active")}
-                            className="inline-flex items-center justify-center px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-500 transition-all"
+                            disabled={statusUpdatingId === m._id}
+                            className="inline-flex items-center justify-center px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-500 transition-all disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            Mark Active
+                            {statusUpdatingId === m._id ? "Updating..." : "Mark Active"}
                           </button>
                         ) : (
                           <button
                             onClick={() => updateMemberStatus(m, "Inactive")}
-                            className="inline-flex items-center justify-center px-3 py-1 rounded bg-orange-600 text-white hover:bg-orange-500 transition-all"
+                            disabled={statusUpdatingId === m._id}
+                            className="inline-flex items-center justify-center px-3 py-1 rounded bg-orange-600 text-white hover:bg-orange-500 transition-all disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            Mark Inactive
+                            {statusUpdatingId === m._id ? "Updating..." : "Mark Inactive"}
                           </button>
                         )}
                         <button
                           onClick={() => handleDelete(m._id)}
-                          className="inline-flex items-center justify-center px-3 py-1 rounded bg-red-600 text-white hover:bg-red-500 transition-all"
+                          disabled={deletingMemberId === m._id}
+                          className="inline-flex items-center justify-center px-3 py-1 rounded bg-red-600 text-white hover:bg-red-500 transition-all disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Delete
+                          {deletingMemberId === m._id ? "Deleting..." : "Delete"}
                         </button>
                       </div>
                     </td>
@@ -1177,9 +1257,9 @@ const MembersList = () => {
       </div>
 
       {isHistoryOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+        <div className="fixed inset-0 z-50 bg-black/70 p-4 md:p-6">
           <div className="bg-gray-900 text-gray-100 w-full max-w-3xl rounded-lg shadow-lg">
-            <div className="flex items-center justify-between border-b border-gray-700 px-5 py-4">
+              <div className="flex items-start justify-between border-b border-gray-800 px-5 py-4 md:px-6">
               <div className="text-lg font-semibold">
                 Payment History {selectedMember?.name ? `• ${selectedMember.name}` : ""}
               </div>
@@ -1467,7 +1547,7 @@ const MembersList = () => {
       )}
 
       {isCycleOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+        <div className="fixed inset-0 z-50 bg-black/70 p-4 md:p-6">
           <div className="bg-gray-900 text-gray-100 w-full max-w-4xl rounded-lg shadow-lg">
             <div className="flex items-center justify-between border-b border-gray-700 px-5 py-4">
               <div className="text-lg font-semibold">
@@ -1518,24 +1598,50 @@ const MembersList = () => {
       )}
 
       {isPayOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="bg-gray-900 text-gray-100 w-full max-w-md rounded-lg shadow-lg">
-            <div className="flex items-center justify-between border-b border-gray-700 px-5 py-4">
+        <div className="fixed inset-0 z-50 bg-black/70 p-4 md:p-6">
+          <div className="mx-auto flex h-full w-full max-w-3xl items-center justify-center">
+            <div className="w-full max-h-[90vh] overflow-hidden rounded-2xl border border-gray-800 bg-gray-950 text-gray-100 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4">
               <div className="text-lg font-semibold">
                 Add Payment {payMember?.name ? `• ${payMember.name}` : ""}
               </div>
               <button
                 onClick={closePay}
-                className="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 transition-all"
+                disabled={submittingPayment}
+                className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm hover:bg-gray-700 transition-all"
               >
                 Close
               </button>
             </div>
-            <form onSubmit={submitPayment} className="p-5 space-y-4">
-              <div className="text-xs text-gray-300">
-                Current Due: Rs.{Number(payMonthSummary?.balance || 0)}
+            <form onSubmit={submitPayment} className="max-h-[calc(90vh-74px)] overflow-y-auto p-5 space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-emerald-200/80">
+                    Total Outstanding
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold text-white">
+                    Rs.{payMemberOutstanding}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-blue-200/80">
+                    Selected Month Due
+                  </div>
+                  <div className="mt-1 text-sm text-gray-300">{payMonth || "-"}</div>
+                  <div className="mt-2 text-2xl font-semibold text-white">
+                    Rs.{Number(payMonthSummary?.balance || 0)}
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs text-gray-300 bg-gray-800/50 border border-gray-700 rounded p-2">
+              {Number(payMonthContext.previousDue || 0) > 0 && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+                  Earlier unpaid due before {payMonth}: Rs.{Number(payMonthContext.previousDue || 0)}.
+                  Payments here apply to the selected month only. Pay {payMonthContext.oldestPendingMonth || "the oldest pending month"} first to clear backlog in order.
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-gray-800 bg-gray-900/80 p-4 text-sm text-gray-300">
+                <div>Earlier Unpaid Due</div>
+                <div className="text-right">Rs.{Number(payMonthContext.previousDue || 0)}</div>
                 <div>Expected Fee ({payMonth || "-"})</div>
                 <div className="text-right">Rs.{Number(payMonthSummary?.expectedFee || 0)}</div>
                 <div>Already Paid</div>
@@ -1546,6 +1652,8 @@ const MembersList = () => {
                 <div className="text-right">Rs.{Number(payMonthSummary?.balance || 0)}</div>
                 <div>Balance After This Payment</div>
                 <div className="text-right">Rs.{payBalanceAfter}</div>
+                <div>Due Up To {payMonth || "-"}</div>
+                <div className="text-right">Rs.{Number(payMonthContext.totalThroughSelectedMonth || 0)}</div>
               </div>
               <div className="flex flex-col">
                 <label className="text-sm text-gray-300 mb-1">Amount</label>
@@ -1553,7 +1661,7 @@ const MembersList = () => {
                   type="number"
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}
-                  className="p-2 rounded bg-gray-800 border border-gray-700"
+                  className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
                   required
                 />
               </div>
@@ -1563,7 +1671,7 @@ const MembersList = () => {
                   type="date"
                   value={payDate}
                   onChange={(e) => setPayDate(e.target.value)}
-                  className="p-2 rounded bg-gray-800 border border-gray-700"
+                  className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
                   required
                 />
               </div>
@@ -1579,7 +1687,7 @@ const MembersList = () => {
                       type="date"
                       value={promiseDate}
                       onChange={(e) => setPromiseDate(e.target.value)}
-                      className="p-2 rounded bg-gray-800 border border-gray-700"
+                      className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
                     />
                   </div>
                 )}
@@ -1588,7 +1696,7 @@ const MembersList = () => {
                 <select
                   value={payMonth}
                   onChange={(e) => setPayMonth(e.target.value)}
-                  className="p-2 rounded bg-gray-800 border border-gray-700"
+                  className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
                   required
                 >
                   <option value="">Select month</option>
@@ -1604,7 +1712,7 @@ const MembersList = () => {
                 <select
                   value={payMode}
                   onChange={(e) => setPayMode(e.target.value)}
-                  className="p-2 rounded bg-gray-800 border border-gray-700"
+                  className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
                   required
                 >
                   <option>Cash</option>
@@ -1620,18 +1728,20 @@ const MembersList = () => {
                   type="text"
                   value={payNote}
                   onChange={(e) => setPayNote(e.target.value)}
-                  className="p-2 rounded bg-gray-800 border border-gray-700"
+                  className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
                   placeholder="Optional"
                 />
               </div>
               <button
                 type="submit"
-                className="w-full px-3 py-2 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                disabled={submittingPayment}
+                className="w-full rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white hover:bg-green-500 transition-all disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Submit Payment
+                {submittingPayment ? "Submitting..." : "Submit Payment"}
               </button>
             </form>
           </div>
+        </div>
         </div>
       )}
 
@@ -1667,7 +1777,7 @@ const MembersList = () => {
                     </div>
                     <div className="p-3 bg-gray-800 rounded border border-gray-700">
                       <div className="text-xs text-gray-400">Total Due</div>
-                      <div className="text-lg font-semibold">Rs.{Number(member360Data.dueNowAmount ?? member360Data.remainingAmount ?? 0)}</div>
+                      <div className="text-lg font-semibold">Rs.{getMemberOutstanding(member360Data)}</div>
                     </div>
                     <div className="p-3 bg-gray-800 rounded border border-gray-700">
                       <div className="text-xs text-gray-400">Current Fee</div>
@@ -1681,7 +1791,7 @@ const MembersList = () => {
                       <div className="text-sm text-gray-300">Phone: {member360Data.phone || "-"}</div>
                       <div className="text-sm text-gray-300">Email: {member360Data.email || "-"}</div>
                       <div className="text-sm text-gray-300">Plan: {member360Data.membershipType || "-"}</div>
-                      <div className="text-sm text-gray-300">Registration: {formatDate(member360Data.registrationDate)}</div>
+                      <div className="text-sm text-gray-300">Joined: {formatDate(member360Data.joinedDate || member360Data.createdAt)}</div>
                       <div className="text-sm text-gray-300">Activation: {formatDate(member360Data.activationDate || member360Data.startDate)}</div>
                       <div className="text-sm text-gray-300">Reminder: {member360Data.reminderStatus || "None"}</div>
                       <div className="text-sm text-gray-300">
@@ -1692,7 +1802,7 @@ const MembersList = () => {
                       <div className="text-sm font-semibold mb-2">Current Cycle</div>
                       {(() => {
                         const cycles = Array.isArray(member360Data.paymentCycles) ? member360Data.paymentCycles : [];
-                        const currentCycle = cycles.length ? cycles[cycles.length - 1] : null;
+                        const currentCycle = member360Data.currentCycle || (cycles.length ? cycles[cycles.length - 1] : null);
                         if (!currentCycle) return <div className="text-sm text-gray-300">No cycle found.</div>;
                         return (
                           <>

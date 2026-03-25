@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { BASE_URL } from "../../utils/fetchData";
+import { LoadingButton } from "../../components";
 
 const EditMember = () => {
   const { id } = useParams();
@@ -14,6 +15,9 @@ const EditMember = () => {
   const [carryForward, setCarryForward] = useState(0);
   const [adjustPayment, setAdjustPayment] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [extending, setExtending] = useState(false);
+  const [restarting, setRestarting] = useState(false);
   const [extendDays, setExtendDays] = useState("");
   const [originalMemberStatus, setOriginalMemberStatus] = useState("Active");
   const [originalActivationDate, setOriginalActivationDate] = useState("");
@@ -29,7 +33,6 @@ const EditMember = () => {
     emergencyPhone: "",
     healthNotes: "",
     membershipType: "Basic",
-    registrationDate: "",
     activationDate: "",
     startDate: "",
     duration: "1 Month",
@@ -95,9 +98,6 @@ const EditMember = () => {
           emergencyPhone: m.emergencyPhone || "",
           healthNotes: m.healthNotes || "",
           membershipType: m.membershipType || "Basic",
-          registrationDate: m.registrationDate
-            ? new Date(m.registrationDate).toISOString().slice(0, 10)
-            : (m.createdAt ? new Date(m.createdAt).toISOString().slice(0, 10) : ""),
           activationDate: m.activationDate
             ? new Date(m.activationDate).toISOString().slice(0, 10)
             : (m.startDate ? new Date(m.startDate).toISOString().slice(0, 10) : ""),
@@ -131,7 +131,11 @@ const EditMember = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    if (uploading) {
+      toast.error("Please wait for the image upload to finish");
+      return;
+    }
+    setSubmitting(true);
     setError("");
     try {
       const payload = { ...member };
@@ -144,7 +148,7 @@ const EditMember = () => {
         });
         if (!statusRes.data?.success) {
           setError(statusRes.data?.message || "Failed to update member status");
-          setLoading(false);
+          setSubmitting(false);
           return;
         }
         setOriginalMemberStatus(member.memberStatus);
@@ -169,7 +173,7 @@ const EditMember = () => {
     } catch (err) {
       setError(err.response?.data?.message || "Failed to update member");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -202,6 +206,7 @@ const EditMember = () => {
       toast.error("Enter valid extend days");
       return;
     }
+    setExtending(true);
     try {
       const res = await axios.post(`${BASE_URL}/api/v1/members/${id}/extend`, {
         extendDays: days,
@@ -215,6 +220,8 @@ const EditMember = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to extend membership");
+    } finally {
+      setExtending(false);
     }
   };
 
@@ -250,6 +257,7 @@ const EditMember = () => {
     const includePreviousDue = window.confirm(
       "Include previous pending due in the new cycle?\n\nOK = Include due\nCancel = Clear previous due"
     );
+    setRestarting(true);
     try {
       const res = await axios.post(`${BASE_URL}/api/v1/members/${id}/restart`, {
         startDate: new Date().toISOString().slice(0, 10),
@@ -270,6 +278,8 @@ const EditMember = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to restart cycle");
+    } finally {
+      setRestarting(false);
     }
   };
 
@@ -297,17 +307,6 @@ const EditMember = () => {
           className="flex flex-col gap-5 w-full max-w-3xl"
           onSubmit={handleSubmit}
         >
-          <div className="flex flex-col">
-            <label className="text-white font-bold mb-1">Registration Date</label>
-            <input
-              type="date"
-              id="registrationDate"
-              value={member.registrationDate}
-              onChange={handleChange}
-              className="p-3 rounded-md outline-none w-full"
-            />
-          </div>
-          
           <input
             type="text"
             placeholder="Full Name"
@@ -397,6 +396,7 @@ const EditMember = () => {
               type="file"
               accept="image/*"
               onChange={handleProfileUpload}
+              disabled={uploading}
               className="p-2 rounded-md outline-none w-full bg-white"
             />
             {uploading && <span className="text-xs text-gray-300 mt-1">Uploading...</span>}
@@ -575,31 +575,36 @@ const EditMember = () => {
               />
             </div>
             <div className="flex items-end">
-              <button
+              <LoadingButton
                 type="button"
                 onClick={handleExtendMembership}
+                loading={extending}
+                loadingText="Extending..."
                 className="w-full px-4 py-3 text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-all"
               >
                 Extend Membership
-              </button>
+              </LoadingButton>
             </div>
           </div>
 
-          <button
+          <LoadingButton
             type="button"
             onClick={handleRestartCycle}
+            loading={restarting}
+            loadingText="Restarting..."
             className="px-5 py-3 text-white bg-orange-600 rounded-md hover:bg-orange-700 transition-all"
           >
             Start Fresh Cycle
-          </button>
+          </LoadingButton>
 
-          <button
+          <LoadingButton
             type="submit"
+            loading={submitting || uploading}
+            loadingText={uploading ? "Uploading image..." : "Saving..."}
             className="btn px-5 py-3 text-xl font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-all"
-            disabled={loading}
           >
             Save Changes
-          </button>
+          </LoadingButton>
         </form>
       </div>
     </section>

@@ -5,7 +5,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/auth';
-import { Input } from "../components";
+import { Input, LoadingButton } from "../components";
 import { BASE_URL } from '../utils/fetchData';
 import AOS from 'aos'; 
 import 'aos/dist/aos.css'; 
@@ -14,11 +14,13 @@ const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const location = useLocation();
   const { auth, setAuth } = useAuth();
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
 
     try {
       const res = await axios.post(`${BASE_URL}/api/v1/auth/login`, {
@@ -37,6 +39,8 @@ const Login = () => {
     } catch (error) {
       console.log(error);
       toast.error("Something went wrong");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -82,13 +86,15 @@ const Login = () => {
             forgot password? <span className='underline text-blue-600 font-semibold'>Reset Password</span>
           </Link> */}
 
-          <button 
+          <LoadingButton 
             type='submit' 
+            loading={submitting}
+            loadingText="Signing In..."
             className='btn px-5 py-2 font-normal outline-none border border-white rounded-sm text-xl text-white hover:text-black hover:bg-white transition-all ease-in w-full max-w-[750px]'
             data-aos="slide-up" // Add AOS animation
           >
             Submit
-          </button>
+          </LoadingButton>
         </form>
       </div>
     </div>

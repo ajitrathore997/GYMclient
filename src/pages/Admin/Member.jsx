@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { BASE_URL } from "../../utils/fetchData";
+import { LoadingButton } from "../../components";
 
 const AddMember = () => {
   const navigate = useNavigate();
@@ -22,7 +23,6 @@ const AddMember = () => {
     emergencyPhone: "",
     healthNotes: "",
     membershipType: "Basic",
-    registrationDate: today,
     activationDate: today,
     startDate: today,
     duration: "1 Month",
@@ -40,6 +40,7 @@ const AddMember = () => {
 
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
@@ -96,6 +97,7 @@ const AddMember = () => {
       toast.error("Please log in to add a member.");
       return;
     }
+    setSubmitting(true);
 
     try {
       const payload = {
@@ -114,6 +116,8 @@ const AddMember = () => {
       const msg = err.response?.data?.message || "Something went wrong!";
       setError(msg);
       toast.error(msg);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -130,17 +134,6 @@ const AddMember = () => {
 
           {error && <div className="text-red-500 text-center">{error}</div>}
 
-<div className="flex flex-col">
-            <label className="text-white font-bold mb-1">Registration Date</label>
-            <input
-              type="date"
-              id="registrationDate"
-              value={member.registrationDate}
-              onChange={handleChange}
-              className="p-3 rounded-md outline-none w-full"
-            />
-          </div>
-          
           {/* Personal Info */}
           <input
             type="text"
@@ -358,12 +351,14 @@ const AddMember = () => {
             className="p-3 rounded-md outline-none w-full"
           />
 
-          <button
+          <LoadingButton
             type="submit"
+            loading={submitting}
+            loadingText="Adding Member..."
             className="btn px-5 py-3 text-xl font-medium text-white bg-blue-500 rounded-md hover:bg-blue-700 transition-all"
           >
             Add Member
-          </button>
+          </LoadingButton>
         </form>
       </div>
     </section>

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { BASE_URL } from "../../utils/fetchData";
+import { LoadingButton } from "../../components";
 
 const statusOptions = [
   "New",
@@ -47,6 +48,10 @@ const Inquiries = () => {
     note: "",
     status: "Planned",
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [savingId, setSavingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
+  const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
 
   const totalPages = useMemo(() => {
     return Math.max(Math.ceil(total / limit), 1);
@@ -93,6 +98,7 @@ const Inquiries = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       const payload = {
         ...form,
@@ -116,6 +122,8 @@ const Inquiries = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to add inquiry");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -152,6 +160,8 @@ const Inquiries = () => {
   };
 
   const saveEdit = async () => {
+    if (!editingId) return;
+    setSavingId(editingId);
     try {
       const payload = {
         ...editForm,
@@ -170,11 +180,14 @@ const Inquiries = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to update inquiry");
+    } finally {
+      setSavingId("");
     }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this inquiry?")) return;
+    setDeletingId(id);
     try {
       const res = await axios.delete(`${BASE_URL}/api/v1/inquiries/${id}`);
       if (res.data?.success) {
@@ -185,6 +198,8 @@ const Inquiries = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete inquiry");
+    } finally {
+      setDeletingId("");
     }
   };
 
@@ -203,6 +218,7 @@ const Inquiries = () => {
   const addFollowUp = async (e) => {
     e.preventDefault();
     if (!followUpInquiry?._id) return;
+    setFollowUpSubmitting(true);
     try {
       const payload = {
         followUp: {
@@ -227,6 +243,8 @@ const Inquiries = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to add follow-up");
+    } finally {
+      setFollowUpSubmitting(false);
     }
   };
 
@@ -329,12 +347,14 @@ const Inquiries = () => {
               onChange={handleChange}
               className="p-2 rounded-md outline-none w-full"
             />
-            <button
+            <LoadingButton
               type="submit"
+              loading={submitting}
+              loadingText="Adding..."
               className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-all"
             >
               Add Inquiry
-            </button>
+            </LoadingButton>
           </form>
         </div>
 
@@ -461,14 +481,18 @@ const Inquiries = () => {
                     <td className="px-4 py-3 text-right">
                       {editingId === i._id ? (
                         <div className="space-x-2">
-                          <button
+                          <LoadingButton
+                            type="button"
                             onClick={saveEdit}
+                            loading={savingId === i._id}
+                            loadingText="Saving..."
                             className="px-2 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
                           >
                             Save
-                          </button>
+                          </LoadingButton>
                           <button
                             onClick={cancelEdit}
+                            type="button"
                             className="px-2 py-1 rounded bg-gray-700 text-white hover:bg-gray-600 transition-all"
                           >
                             Cancel
@@ -488,12 +512,15 @@ const Inquiries = () => {
                           >
                             Follow Ups
                           </button>
-                          <button
+                          <LoadingButton
+                            type="button"
                             onClick={() => handleDelete(i._id)}
+                            loading={deletingId === i._id}
+                            loadingText="Deleting..."
                             className="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-500 transition-all"
                           >
                             Delete
-                          </button>
+                          </LoadingButton>
                         </div>
                       )}
                     </td>
@@ -587,12 +614,14 @@ const Inquiries = () => {
                   }
                   className="p-2 rounded bg-gray-800 border border-gray-700"
                 />
-                <button
+                <LoadingButton
                   type="submit"
+                  loading={followUpSubmitting}
+                  loadingText="Adding..."
                   className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition-all"
                 >
                   Add Follow Up
-                </button>
+                </LoadingButton>
               </form>
 
               <div className="overflow-x-auto">

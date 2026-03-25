@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Heading, Input, TextArea } from '../components';
+import { Heading, Input, LoadingButton, TextArea } from '../components';
 import { toast } from "react-hot-toast";
 import axios from "axios";
 import { BASE_URL } from '../utils/fetchData';
@@ -15,6 +15,7 @@ const Contact = () => {
   const [city, setCity] = useState("");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -52,6 +53,7 @@ const Contact = () => {
     }
 
     console.log(name, email, city, phone, message);
+    setSubmitting(true);
 
     try {
       const { data } = await axios.post(`${BASE_URL}/api/v1/contact/create-contact`, {
@@ -75,6 +77,8 @@ const Contact = () => {
       }
     } catch (error) {
       console.log(error);
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -135,11 +139,13 @@ const Contact = () => {
           </div>
 
           <div data-aos="zoom-in" className='w-full max-w-[750px]' data-aos-delay="300" > {/* AOS zoom-in for submit button */}
-            <button
+            <LoadingButton
               className='w-full max-w-[750px] border-2 px-4 py-3 text-white border-white text-center text-xl font-medium hover:bg-white transition-all ease-in hover:text-black'
-              type='submit'>
+              type='submit'
+              loading={submitting}
+              loadingText="Submitting...">
               Submit
-            </button>
+            </LoadingButton>
           </div>
         </form>
       </div>

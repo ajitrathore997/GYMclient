@@ -21,6 +21,28 @@ const AuthProvider = ({children}) => {
      }
     },[]);
 
+    useEffect(() => {
+        const interceptor = axios.interceptors.response.use(
+            (response) => response,
+            (error) => {
+                if (error?.response?.status === 401) {
+                    setAuth({ user: null, token: "" });
+                    localStorage.removeItem("auth");
+                    delete axios.defaults.headers.common["Authorization"];
+
+                    if (window.location.pathname !== "/login") {
+                        window.location.href = "/login";
+                    }
+                }
+                return Promise.reject(error);
+            }
+        );
+
+        return () => {
+            axios.interceptors.response.eject(interceptor);
+        };
+    }, []);
+
 return (
     <AuthContext.Provider value={{auth, setAuth}}>
         {children}

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from 'react-hot-toast';
-import { Input } from "../components";
+import { Input, LoadingButton } from "../components";
 import { BASE_URL } from '../utils/fetchData';
 import AOS from 'aos'; 
 import 'aos/dist/aos.css'; 
@@ -16,6 +16,7 @@ const Register = () => {
   const [email, setEmail] = useState("");
   const [city, setCity] = useState("");
   const [contact, setContact] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -48,6 +49,7 @@ const Register = () => {
     }
 
     console.log(name, password, email, city, contact);
+    setSubmitting(true);
 
     try {
       const res = await axios.post(`${BASE_URL}/api/v1/auth/register`, {
@@ -67,6 +69,8 @@ const Register = () => {
     } catch (error) {
       console.log(error);
       toast.error("Something went wrong");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -141,13 +145,15 @@ const Register = () => {
             Already a registered user? <span className='underline text-blue-600 font-semibold'>Login</span>
           </Link>
 
-          <button 
+          <LoadingButton 
             type='submit' 
+            loading={submitting}
+            loadingText="Creating Account..."
             className='btn px-5 py-2 font-normal outline-none border border-white rounded-sm text-xl text-white hover:text-black hover:bg-white transition-all ease-in w-full max-w-[750px]'
             data-aos="slide-up" // Add AOS animation
           >
             Submit
-          </button>
+          </LoadingButton>
         </form>
       </div>
     </div>

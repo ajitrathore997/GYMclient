@@ -10,22 +10,29 @@ const AdminRoute = () => {
     const {auth, setAuth} = useAuth();
     useEffect(() => {
         const authCheck = async () => {
-            // const res = await axios.get("http://localhost:5000/api/v1/auth/admin-auth");
-            const res = await axios.get(`${BASE_URL}/api/v1/auth/admin-auth`);
-            if (res.data.ok) {
-                setOk(true);
-            }
-            else{
+            try {
+                const res = await axios.get(`${BASE_URL}/api/v1/auth/admin-auth`);
+                if (res.data.ok) {
+                    setOk(true);
+                }
+                else{
+                    setOk(false);
+                }
+            } catch (error) {
                 setOk(false);
+                setAuth({ user: null, token: "" });
+                localStorage.removeItem("auth");
             }
         }
         if (auth?.token) {
             authCheck();
+        } else {
+            setOk(false);
         }
-    } ,[auth?.token]);
+    } ,[auth?.token, setAuth]);
 
   return ( 
-    ok ? <Outlet/> : <Spinner path=''/>
+    ok ? <Outlet/> : <Spinner path='login'/>
   ) 
 }
 

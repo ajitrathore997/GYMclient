@@ -6,11 +6,13 @@ import { useAuth } from '../context/auth'; // Adjust the path accordingly
 import {toast} from "react-hot-toast";
 import { Link } from 'react-router-dom';
 import { BASE_URL } from '../utils/fetchData';
+import { LoadingButton } from "../components";
 const Feedback = () => {
   const [message, setMessage] = useState('');
   const [rating, setRating] = useState(1);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const { auth } = useAuth();
 
@@ -20,6 +22,7 @@ const Feedback = () => {
     if (!auth.user) {
       return alert('Please log in to submit feedback.');
     }
+    setSubmitting(true);
 
     try {
   
@@ -36,6 +39,8 @@ const Feedback = () => {
         console.error(err);
         setError('Error submitting feedback. Please try again.');
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -92,12 +97,14 @@ const Feedback = () => {
         </div>
         
         <div className="flex justify-center">
-          <button
+          <LoadingButton
             type="submit"
+            loading={submitting}
+            loadingText="Submitting..."
             className="bg-blue-500 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 transition duration-200"
           >
             Submit
-          </button>
+          </LoadingButton>
         </div>
       </form>
     </div>

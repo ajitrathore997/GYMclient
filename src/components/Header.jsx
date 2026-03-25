@@ -1,18 +1,20 @@
 
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth';
 import toast from 'react-hot-toast';
 
 const Header = () => {
   const { auth, setAuth } = useAuth();
   const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogout = () => {
     setAuth({ ...auth, user: null, token: "" });
     localStorage.removeItem("auth");
     toast.success("Logout successfully");
+    navigate("/");
   };
 
   return (
@@ -72,6 +74,13 @@ const Header = () => {
               <li>
                 <Link to="/dashboard/admin/inquiries" className="text-white hover:text-yellow-400 transition-all duration-300">
                   Inquiries
+                </Link>
+              </li>
+            )}
+            {auth?.user?.role === 1 && (
+              <li>
+                <Link to="/dashboard/admin/supplements" className="text-white hover:text-yellow-400 transition-all duration-300">
+                  Supplements
                 </Link>
               </li>
             )}
@@ -145,6 +154,13 @@ const Header = () => {
               <li>
                 <Link to="/dashboard/admin/inquiries" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
                   Inquiries
+                </Link>
+              </li>
+            )}
+            {auth?.user?.role === 1 && (
+              <li>
+                <Link to="/dashboard/admin/supplements" className="text-white hover:text-yellow-400 transition-all duration-300" onClick={() => setMobileMenuOpen(false)}>
+                  Supplements
                 </Link>
               </li>
             )}

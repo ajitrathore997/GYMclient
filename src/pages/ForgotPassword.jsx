@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from "react-router-dom";
 import toast from 'react-hot-toast';
 import axios from "axios";
-import { Input } from "../components";
+import { Input, LoadingButton } from "../components";
 import { BASE_URL } from '../utils/fetchData';
 import AOS from 'aos'; 
 import 'aos/dist/aos.css'; 
@@ -11,10 +11,12 @@ import 'aos/dist/aos.css';
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
   const submitPassword = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
 
     try {
       const res = await axios.post(`${BASE_URL}/api/v1/auth/forgot-password`, {
@@ -31,6 +33,8 @@ const ForgotPassword = () => {
     } catch (error) {
       console.log(error);
       toast.error("Something went wrong");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -68,14 +72,16 @@ const ForgotPassword = () => {
             data-aos="fade-up" 
           />
 
-          <button
+          <LoadingButton
             className='btn px-5 py-2 font-normal outline-none border border-white rounded-sm text-xl text-white hover:text-black hover:bg-white transition-all ease-in w-full max-w-[750px]'
             type='submit'
+            loading={submitting}
+            loadingText="Resetting..."
             onClick={submitPassword}
             data-aos="slide-up"
           >
             Reset
-          </button>
+          </LoadingButton>
         </form>
       </div>
     </section>

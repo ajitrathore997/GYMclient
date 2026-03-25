@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { BASE_URL } from "../../utils/fetchData";
+import { LoadingButton } from "../../components";
 
 const Expenses = () => {
   const [form, setForm] = useState({
@@ -24,6 +25,9 @@ const Expenses = () => {
     date: "",
     note: "",
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [savingId, setSavingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
 
   useEffect(() => {
     const today = new Date();
@@ -75,6 +79,7 @@ const Expenses = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitting(true);
     try {
       const payload = {
         name: form.name,
@@ -92,6 +97,8 @@ const Expenses = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to add expense");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -111,6 +118,8 @@ const Expenses = () => {
   };
 
   const saveEdit = async () => {
+    if (!editingId) return;
+    setSavingId(editingId);
     try {
       const payload = {
         name: editForm.name,
@@ -130,11 +139,14 @@ const Expenses = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to update expense");
+    } finally {
+      setSavingId("");
     }
   };
 
   const handleDelete = async (expenseId) => {
     if (!window.confirm("Delete this expense?")) return;
+    setDeletingId(expenseId);
     try {
       const res = await axios.delete(`${BASE_URL}/api/v1/expenses/${expenseId}`);
       if (res.data?.success) {
@@ -145,6 +157,8 @@ const Expenses = () => {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to delete expense");
+    } finally {
+      setDeletingId("");
     }
   };
 
@@ -218,12 +232,14 @@ const Expenses = () => {
               onChange={handleChange}
               className="p-2 rounded-md outline-none w-full"
             />
-            <button
+            <LoadingButton
               type="submit"
+              loading={submitting}
+              loadingText="Adding..."
               className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-all"
             >
               Add Expense
-            </button>
+            </LoadingButton>
           </form>
         </div>
 
@@ -313,14 +329,18 @@ const Expenses = () => {
                     <td className="px-4 py-3 text-right">
                       {editingId === e._id ? (
                         <div className="space-x-2">
-                          <button
+                          <LoadingButton
+                            type="button"
                             onClick={saveEdit}
+                            loading={savingId === e._id}
+                            loadingText="Saving..."
                             className="px-2 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
                           >
                             Save
-                          </button>
+                          </LoadingButton>
                           <button
                             onClick={cancelEdit}
+                            type="button"
                             className="px-2 py-1 rounded bg-gray-700 text-white hover:bg-gray-600 transition-all"
                           >
                             Cancel
@@ -334,12 +354,15 @@ const Expenses = () => {
                           >
                             Edit
                           </button>
-                          <button
+                          <LoadingButton
+                            type="button"
                             onClick={() => handleDelete(e._id)}
+                            loading={deletingId === e._id}
+                            loadingText="Deleting..."
                             className="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-500 transition-all"
                           >
                             Delete
-                          </button>
+                          </LoadingButton>
                         </div>
                       )}
                     </td>

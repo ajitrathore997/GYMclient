@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from "axios";
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Input} from "../components";
+import { Input, LoadingButton } from "../components";
 import { useAuth } from '../context/auth';
 import { BASE_URL } from '../utils/fetchData';
 const Profile = () => {
@@ -12,6 +12,7 @@ const Profile = () => {
   const [email, setEmail] = useState("");
   const [city, setCity] = useState("");
   const [contact, setContact] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
 
   // const [goal, setGoal] = useState("");
@@ -53,6 +54,7 @@ const Profile = () => {
     }
 
     console.log(name, email, city, contact);
+    setSubmitting(true);
 
     try {
   
@@ -86,6 +88,8 @@ const Profile = () => {
     } catch (error) {
       console.log(error);
       toast.error("something went wrong");
+    } finally {
+      setSubmitting(false);
     }
 
   }
@@ -142,7 +146,14 @@ const Profile = () => {
           // maxLength="10"
         />
 
-        <button type='submit' className='btn px-5 py-2 font-normal outline-none border border-white rounded-sm text-xl text-white hover:text-black hover:bg-white transition-all ease-in w-full max-w-[750px]' >Update</button>
+        <LoadingButton
+          type='submit'
+          loading={submitting}
+          loadingText="Updating..."
+          className='btn px-5 py-2 font-normal outline-none border border-white rounded-sm text-xl text-white hover:text-black hover:bg-white transition-all ease-in w-full max-w-[750px]'
+        >
+          Update
+        </LoadingButton>
       </form>
     </div>
     </section>

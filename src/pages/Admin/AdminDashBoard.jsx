@@ -180,6 +180,8 @@ const AdminDashBoard = () => {
   const [allTimeStatsLoading, setAllTimeStatsLoading] = useState(false);
   const [promisedMembers, setPromisedMembers] = useState([]);
   const [promisedLoading, setPromisedLoading] = useState(false);
+  const [supplementStats, setSupplementStats] = useState(null);
+  const [supplementLoading, setSupplementLoading] = useState(false);
   const [range, setRange] = useState({ startDate: "", endDate: "" });
 
   // AOS Initialization
@@ -206,6 +208,7 @@ const AdminDashBoard = () => {
     getMemberStats(start, end);
     getAllTimeMemberStats();
     getPromisedPendingMembers();
+    getSupplementStats();
   }, []);
 
   const getUsers = async () => {
@@ -373,11 +376,30 @@ const AdminDashBoard = () => {
     }
   };
 
+  const getSupplementStats = async () => {
+    try {
+      setSupplementLoading(true);
+      const res = await axios.get(`${BASE_URL}/api/v1/supplements/dashboard`);
+      if (res.data?.success) {
+        setSupplementStats(res.data.stats);
+      } else {
+        setSupplementStats(null);
+      }
+      setSupplementLoading(false);
+    } catch (err) {
+      console.log(err);
+      toast.error("Something went wrong in getting supplement stats");
+      setSupplementStats(null);
+      setSupplementLoading(false);
+    }
+  };
+
   const refreshDashboardData = async (startDate = range.startDate, endDate = range.endDate) => {
     await Promise.all([
       getMemberStats(startDate, endDate),
       getAllTimeMemberStats(),
       getPromisedPendingMembers(),
+      getSupplementStats(),
     ]);
   };
 
@@ -500,6 +522,34 @@ const AdminDashBoard = () => {
   const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
   window.open(url, "_blank", "noopener,noreferrer");
+};
+
+const openSupplementWhatsApp = (sale) => {
+  const phone = normalizePhone(sale?.memberPhone);
+  if (!phone) {
+    toast.error("Member phone number not available");
+    return;
+  }
+
+  const dueDate = sale?.paymentDueDate
+    ? new Date(sale.paymentDueDate).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "soon";
+
+  const message = `Hi ${sale?.memberName || "Member"}, supplement payment reminder.\nSupplement: ${
+    sale?.supplementName || "-"
+  }\nTotal: Rs.${Number(sale?.totalAmount || 0)}\nPaid: Rs.${Number(
+    sale?.paidAmount || 0
+  )}\nRemaining: Rs.${Number(sale?.remainingAmount || 0)}\nDue date: ${dueDate}\nPlease clear the pending amount when possible.`;
+
+  window.open(
+    `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+    "_blank",
+    "noopener,noreferrer"
+  );
 };
 
   if (loading) {
@@ -640,6 +690,113 @@ const AdminDashBoard = () => {
               {memberStats ? memberStats.netInRange : "Loading..."}
             </h3>
           </div>
+        </div>
+
+        <div className="bg-gray-800 p-5 border border-white mb-10" data-aos="fade-up">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white text-xl font-semibold">Supplements</h3>
+            <Link
+              to="/dashboard/admin/supplements"
+              className="text-sm text-yellow-400 hover:underline"
+            >
+              Manage Supplements
+            </Link>
+          </div>
+          {supplementLoading || !supplementStats ? (
+            <p className="text-gray-300">Loading...</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Entries</p>
+                  <p className="text-white text-lg font-semibold">{supplementStats.totalEntries}</p>
+                </div>
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Total Sales</p>
+                  <p className="text-white text-lg font-semibold">Rs.{Number(supplementStats.totalSales || 0)}</p>
+                </div>
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Collected</p>
+                  <p className="text-green-400 text-lg font-semibold">Rs.{Number(supplementStats.totalCollected || 0)}</p>
+                </div>
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Outstanding</p>
+                  <p className="text-orange-300 text-lg font-semibold">Rs.{Number(supplementStats.totalOutstanding || 0)}</p>
+                </div>
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Upcoming</p>
+                  <p className="text-yellow-300 text-lg font-semibold">{supplementStats.upcomingCount}</p>
+                </div>
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Overdue</p>
+                  <p className="text-red-300 text-lg font-semibold">{supplementStats.overdueCount}</p>
+                </div>
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Due Today</p>
+                  <p className="text-blue-300 text-lg font-semibold">{supplementStats.dueTodayCount}</p>
+                </div>
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">No Due Date</p>
+                  <p className="text-gray-200 text-lg font-semibold">{supplementStats.noDueDateCount}</p>
+                </div>
+                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
+                  <p className="text-gray-400 text-xs">Fully Paid</p>
+                  <p className="text-emerald-300 text-lg font-semibold">{supplementStats.paidCount}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-gray-300 mb-3">Recent Pending Supplement Dues</p>
+                {supplementStats.recentPending?.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-left text-sm text-gray-200">
+                      <thead className="bg-gray-700 text-gray-100">
+                        <tr>
+                          <th className="px-4 py-3">Member</th>
+                          <th className="px-4 py-3">Phone</th>
+                          <th className="px-4 py-3">Supplement</th>
+                          <th className="px-4 py-3">Due Date</th>
+                          <th className="px-4 py-3">Remaining</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3 text-center w-40">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {supplementStats.recentPending.map((sale) => (
+                          <tr key={sale._id} className="border-b border-gray-700">
+                            <td className="px-4 py-3">{sale.memberName}</td>
+                            <td className="px-4 py-3">{sale.memberPhone || "-"}</td>
+                            <td className="px-4 py-3">{sale.supplementName}</td>
+                            <td className="px-4 py-3">
+                              {sale.paymentDueDate
+                                ? new Date(sale.paymentDueDate).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })
+                                : "-"}
+                            </td>
+                            <td className="px-4 py-3">Rs.{Number(sale.remainingAmount || 0)}</td>
+                            <td className="px-4 py-3">{sale.paymentStatus}</td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => openSupplementWhatsApp(sale)}
+                                className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                              >
+                                WhatsApp
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-gray-400">No pending supplement dues.</p>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="bg-gray-800 p-5 border border-white mb-10" data-aos="fade-up">
