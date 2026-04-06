@@ -61,7 +61,7 @@ const MembersList = () => {
     maxPaid: "",
     startFrom: "",
     startTo: "",
-    sortBy: "createdAt",
+    sortBy: "activationDate",
     sortOrder: "desc",
   });
 
@@ -359,7 +359,7 @@ const MembersList = () => {
       maxPaid: "",
       startFrom: "",
       startTo: "",
-      sortBy: "createdAt",
+      sortBy: "activationDate",
       sortOrder: "desc",
     });
     setPage(1);
@@ -1031,7 +1031,7 @@ const MembersList = () => {
               onChange={handleFilterChange}
               className="p-2 rounded-md outline-none w-full"
             >
-              <option value="createdAt">Joined Date</option>
+              <option value="createdAt">Entry Date</option>
               <option value="name">Name</option>
               <option value="fee">Fee</option>
               <option value="paidAmount">Paid</option>
@@ -1082,7 +1082,7 @@ const MembersList = () => {
                   <th className="px-4 py-3">Remaining</th>
                   <th className="px-4 py-3">Payment</th>
                   <th className="px-4 py-3">Member</th>
-                  <th className="px-4 py-3">Joined</th>
+                  <th className="px-4 py-3">Entry Date</th>
                   <th className="px-4 py-3">Activation</th>
                   <th className="px-4 py-3">Expiry</th>
                   <th className="px-4 py-3">Last Month</th>
