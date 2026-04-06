@@ -598,9 +598,9 @@ const openSupplementWhatsApp = (sale) => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
           <div className="p-5 border border-white bg-gray-800" data-aos="fade-up">
-            <p className="text-gray-300 text-sm">Total Members</p>
+            <p className="text-gray-300 text-sm">Total Active Members</p>
             <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.totalMembers : "Loading..."}
+              {allTimeMemberStats ? allTimeMemberStats.activeMembersCount : "Loading..."}
             </h3>
           </div>
           <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="50">
@@ -652,7 +652,7 @@ const openSupplementWhatsApp = (sale) => {
             </h3>
           </div>
           <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="550">
-            <p className="text-gray-300 text-sm">Active Members</p>
+            <p className="text-gray-300 text-sm">Active Members (Range)</p>
             <h3 className="text-white font-bold text-3xl">
               {memberStats ? memberStats.activeMembersCount : "Loading..."}
             </h3>
