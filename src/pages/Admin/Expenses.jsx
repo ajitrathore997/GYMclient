@@ -4,6 +4,10 @@ import toast from "react-hot-toast";
 import { BASE_URL } from "../../utils/fetchData";
 import { LoadingButton } from "../../components";
 
+const dashboardFilterFieldClass = "flex flex-col gap-1";
+const dashboardFilterInputClass =
+  "h-10 rounded-xl border border-gray-700 bg-gray-900 px-3 text-sm text-white outline-none transition-all focus:border-blue-500";
+
 const Expenses = () => {
   const [form, setForm] = useState({
     name: "",
@@ -169,9 +173,9 @@ const Expenses = () => {
           <h2 className="text-3xl font-bold text-white">Expenses</h2>
         </div>
 
-        <div className="bg-gray-800 p-4 rounded-md mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="flex flex-col">
+        <div className="mb-6 rounded-2xl border border-gray-800 bg-gray-800/95 p-4 shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(180px,0.9fr)_minmax(180px,0.9fr)] xl:items-end">
+            <div className={dashboardFilterFieldClass}>
               <label className="text-gray-300 text-sm mb-1">Start Date</label>
               <input
                 type="date"
@@ -179,10 +183,10 @@ const Expenses = () => {
                 onChange={(e) =>
                   setRange((prev) => ({ ...prev, startDate: e.target.value }))
                 }
-                className="p-2 rounded-md outline-none w-full"
+                className={dashboardFilterInputClass}
               />
             </div>
-            <div className="flex flex-col">
+            <div className={dashboardFilterFieldClass}>
               <label className="text-gray-300 text-sm mb-1">End Date</label>
               <input
                 type="date"
@@ -190,7 +194,7 @@ const Expenses = () => {
                 onChange={(e) =>
                   setRange((prev) => ({ ...prev, endDate: e.target.value }))
                 }
-                className="p-2 rounded-md outline-none w-full"
+                className={dashboardFilterInputClass}
               />
             </div>
           </div>

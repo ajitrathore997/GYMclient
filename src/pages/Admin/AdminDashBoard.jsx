@@ -155,16 +155,61 @@
 // export default AdminDashBoard;
 
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from "axios";
-import { Heading, Loader } from '../../components';
+import { Loader } from '../../components';
 import { toast } from "react-hot-toast";
 import { BASE_URL } from "../../utils/fetchData";
 import AOS from 'aos';
 import 'aos/dist/aos.css'; // Import AOS styles
 import { BarChart } from "@mui/x-charts/BarChart";
 import { useAuth } from '../../context/auth';
+
+const dashboardCardClass =
+  "rounded-2xl border border-gray-800 bg-gradient-to-br from-gray-900 via-gray-850 to-gray-900 px-4 py-4 shadow-[0_12px_28px_rgba(0,0,0,0.22)]";
+
+const dashboardCardLabelClass =
+  "text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-400";
+
+const dashboardCardValueClass = "mt-2 text-2xl font-semibold text-white";
+const dashboardFilterFieldClass = "flex flex-col gap-1";
+const dashboardFilterInputClass =
+  "h-10 rounded-xl border border-gray-700 bg-gray-900 px-3 text-sm text-gray-100 outline-none transition-all focus:border-blue-500";
+const dashboardTablePageSize = 10;
+
+const TablePagination = ({ page, totalItems, onPageChange }) => {
+  const totalPages = Math.max(Math.ceil(totalItems / dashboardTablePageSize), 1);
+  if (totalItems <= dashboardTablePageSize) return null;
+  const startItem = (page - 1) * dashboardTablePageSize + 1;
+  const endItem = Math.min(page * dashboardTablePageSize, totalItems);
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 text-sm text-gray-300 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        Showing {startItem}-{endItem} of {totalItems} • Page {page} of {totalPages}
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(page - 1, 1))}
+          disabled={page <= 1}
+          className="rounded-lg bg-gray-700 px-3 py-1 text-white transition-all hover:bg-gray-600 disabled:opacity-50"
+        >
+          Prev
+        </button>
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(page + 1, totalPages))}
+          disabled={page >= totalPages}
+          className="rounded-lg bg-gray-700 px-3 py-1 text-white transition-all hover:bg-gray-600 disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const AdminDashBoard = () => {
   const { auth } = useAuth();
@@ -183,6 +228,42 @@ const AdminDashBoard = () => {
   const [supplementStats, setSupplementStats] = useState(null);
   const [supplementLoading, setSupplementLoading] = useState(false);
   const [range, setRange] = useState({ startDate: "", endDate: "" });
+  const [defaultersPage, setDefaultersPage] = useState(1);
+  const [promisedPage, setPromisedPage] = useState(1);
+  const [dueNextWeekPage, setDueNextWeekPage] = useState(1);
+
+  const defaulters = allTimeMemberStats?.defaulters || [];
+  const dueNextWeekMembers = allTimeMemberStats?.dueNextWeekMembers || [];
+
+  const pagedDefaulters = useMemo(() => {
+    const start = (defaultersPage - 1) * dashboardTablePageSize;
+    return defaulters.slice(start, start + dashboardTablePageSize);
+  }, [defaulters, defaultersPage]);
+
+  const pagedPromisedMembers = useMemo(() => {
+    const start = (promisedPage - 1) * dashboardTablePageSize;
+    return promisedMembers.slice(start, start + dashboardTablePageSize);
+  }, [promisedMembers, promisedPage]);
+
+  const pagedDueNextWeekMembers = useMemo(() => {
+    const start = (dueNextWeekPage - 1) * dashboardTablePageSize;
+    return dueNextWeekMembers.slice(start, start + dashboardTablePageSize);
+  }, [dueNextWeekMembers, dueNextWeekPage]);
+
+  useEffect(() => {
+    const totalPages = Math.max(Math.ceil(defaulters.length / dashboardTablePageSize), 1);
+    if (defaultersPage > totalPages) setDefaultersPage(totalPages);
+  }, [defaulters.length, defaultersPage]);
+
+  useEffect(() => {
+    const totalPages = Math.max(Math.ceil(promisedMembers.length / dashboardTablePageSize), 1);
+    if (promisedPage > totalPages) setPromisedPage(totalPages);
+  }, [promisedMembers.length, promisedPage]);
+
+  useEffect(() => {
+    const totalPages = Math.max(Math.ceil(dueNextWeekMembers.length / dashboardTablePageSize), 1);
+    if (dueNextWeekPage > totalPages) setDueNextWeekPage(totalPages);
+  }, [dueNextWeekMembers.length, dueNextWeekPage]);
 
   // AOS Initialization
   useEffect(() => {
@@ -557,14 +638,17 @@ const openSupplementWhatsApp = (sale) => {
   }
 
   return (
-    <section className='pt-10 bg-gray-900'>
-      <Heading name="Admin Dashboard" />
-      <div className="container mx-auto px-6 py-20">
+    <section className='bg-gray-900'>
+      <div className="container mx-auto px-6 py-8 md:py-10">
         {auth?.user?.access === 1 && (
         <div>
-        <div className="bg-gray-800 p-4 border border-white mb-8">
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex flex-col">
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold text-white sm:text-3xl">Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-400">Track members, collections, and supplement dues.</p>
+        </div>
+        <div className="mb-8 rounded-2xl border border-gray-800 bg-gray-800/95 p-4 shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(180px,0.9fr)_minmax(180px,0.9fr)_auto] xl:items-end">
+            <div className={dashboardFilterFieldClass}>
               <label className="text-gray-300 text-sm mb-1">Start Date</label>
               <input
                 type="date"
@@ -572,10 +656,10 @@ const openSupplementWhatsApp = (sale) => {
                 onChange={(e) =>
                   setRange((prev) => ({ ...prev, startDate: e.target.value }))
                 }
-                className="p-2 rounded-md outline-none"
+                className={dashboardFilterInputClass}
               />
             </div>
-            <div className="flex flex-col">
+            <div className={dashboardFilterFieldClass}>
               <label className="text-gray-300 text-sm mb-1">End Date</label>
               <input
                 type="date"
@@ -583,111 +667,75 @@ const openSupplementWhatsApp = (sale) => {
                 onChange={(e) =>
                   setRange((prev) => ({ ...prev, endDate: e.target.value }))
                 }
-                className="p-2 rounded-md outline-none"
+                className={dashboardFilterInputClass}
               />
             </div>
             <button
               onClick={() => {
                 refreshDashboardData(range.startDate, range.endDate);
               }}
-              className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-all"
+              className="h-10 rounded-xl bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 transition-all sm:col-span-2 xl:col-span-1"
             >
               Apply
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up">
-            <p className="text-gray-300 text-sm">Total Active Members</p>
-            <h3 className="text-white font-bold text-3xl">
+        <div className="grid grid-cols-2 xl:grid-cols-5 gap-3 mb-8">
+          <div className={dashboardCardClass} data-aos="fade-up">
+            <p className={dashboardCardLabelClass}>Total Active Members</p>
+            <h3 className={dashboardCardValueClass}>
               {allTimeMemberStats ? allTimeMemberStats.activeMembersCount : "Loading..."}
             </h3>
           </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="50">
-            <p className="text-gray-300 text-sm">Members Joined (Range)</p>
-            <h3 className="text-white font-bold text-3xl">
+          <div className={dashboardCardClass} data-aos="fade-up" data-aos-delay="50">
+            <p className={dashboardCardLabelClass}>Members Joined (Range)</p>
+            <h3 className={dashboardCardValueClass}>
               {memberStats ? memberStats.membersJoinedInRange : "Loading..."}
             </h3>
           </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="100">
-            <p className="text-gray-300 text-sm">Pending Fees</p>
-            <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.pendingCount : "Loading..."}
+          <div className={dashboardCardClass} data-aos="fade-up" data-aos-delay="100">
+            <p className={dashboardCardLabelClass}>Pending Fees</p>
+            <h3 className="mt-2 text-2xl font-semibold text-orange-300">
+              {allTimeMemberStats ? allTimeMemberStats.pendingCount : "Loading..."}
             </h3>
           </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="200">
-            <p className="text-gray-300 text-sm">Total Paid</p>
-            <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.totalPaid : "Loading..."}
+          <div className={dashboardCardClass} data-aos="fade-up" data-aos-delay="150">
+            <p className={dashboardCardLabelClass}>Overdue Members</p>
+            <h3 className="mt-2 text-2xl font-semibold text-red-300">
+              {allTimeMemberStats ? allTimeMemberStats.overdueMembersCount : "Loading..."}
             </h3>
           </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="300">
-            <p className="text-gray-300 text-sm">Paid In Range</p>
-            <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.paidInRange : "Loading..."}
-            </h3>
-          </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="350">
-            <p className="text-gray-300 text-sm">Total Due Now</p>
-            <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.totalDueNow : "Loading..."}
-            </h3>
-          </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="400">
-            <p className="text-gray-300 text-sm">Overdue Members</p>
-            <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.overdueMembersCount : "Loading..."}
-            </h3>
-          </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="450">
-            <p className="text-gray-300 text-sm">Promised Members</p>
-            <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.promisedMembersCount : "Loading..."}
-            </h3>
-          </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="500">
-            <p className="text-gray-300 text-sm">Promised Due</p>
-            <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.promisedDueAmount : "Loading..."}
-            </h3>
-          </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="550">
-            <p className="text-gray-300 text-sm">Active Members (Range)</p>
-            <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.activeMembersCount : "Loading..."}
+          <div className={dashboardCardClass} data-aos="fade-up" data-aos-delay="200">
+            <p className={dashboardCardLabelClass}>Promised Due</p>
+            <h3 className="mt-2 text-2xl font-semibold text-amber-300">
+              {allTimeMemberStats ? allTimeMemberStats.promisedDueAmount : "Loading..."}
             </h3>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up">
-            <p className="text-gray-300 text-sm">Payments In Range</p>
-            <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.paymentsCountInRange : "Loading..."}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-10">
+          <div className={dashboardCardClass} data-aos="fade-up">
+            <p className={dashboardCardLabelClass}>Paid In Range</p>
+            <h3 className="mt-2 text-2xl font-semibold text-emerald-300">
+              {memberStats ? memberStats.paidInRange : "Loading..."}
             </h3>
           </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="100">
-            <p className="text-gray-300 text-sm">Total Remaining</p>
-            <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.totalRemaining : "Loading..."}
-            </h3>
-          </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="200">
-            <p className="text-gray-300 text-sm">Total Fee</p>
-            <h3 className="text-white font-bold text-3xl">
-              {memberStats ? memberStats.totalFee : "Loading..."}
-            </h3>
-          </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="300">
-            <p className="text-gray-300 text-sm">Expenses In Range</p>
-            <h3 className="text-white font-bold text-3xl">
+          <div className={dashboardCardClass} data-aos="fade-up" data-aos-delay="100">
+            <p className={dashboardCardLabelClass}>Expenses In Range</p>
+            <h3 className="mt-2 text-2xl font-semibold text-rose-300">
               {memberStats ? memberStats.expensesInRange : "Loading..."}
             </h3>
           </div>
-          <div className="p-5 border border-white bg-gray-800" data-aos="fade-up" data-aos-delay="400">
-            <p className="text-gray-300 text-sm">Income (Paid - Expense)</p>
-            <h3 className="text-white font-bold text-3xl">
+          <div className={dashboardCardClass} data-aos="fade-up" data-aos-delay="200">
+            <p className={dashboardCardLabelClass}>Income (Paid - Expense)</p>
+            <h3 className={`mt-2 text-2xl font-semibold ${Number(memberStats?.netInRange || 0) >= 0 ? "text-cyan-300" : "text-orange-300"}`}>
               {memberStats ? memberStats.netInRange : "Loading..."}
+            </h3>
+          </div>
+          <div className={dashboardCardClass} data-aos="fade-up" data-aos-delay="300">
+            <p className={dashboardCardLabelClass}>Promised Members</p>
+            <h3 className="mt-2 text-2xl font-semibold text-violet-300">
+              {promisedLoading ? "Loading..." : promisedMembers.length}
             </h3>
           </div>
         </div>
@@ -706,42 +754,18 @@ const openSupplementWhatsApp = (sale) => {
             <p className="text-gray-300">Loading...</p>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
-                  <p className="text-gray-400 text-xs">Entries</p>
-                  <p className="text-white text-lg font-semibold">{supplementStats.totalEntries}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                <div className="rounded-xl border border-gray-700 bg-gray-900 px-4 py-3">
+                  <p className="text-gray-400 text-[11px] font-semibold uppercase tracking-[0.16em]">Pending</p>
+                  <p className="mt-1 text-xl font-semibold text-orange-300">Rs.{Number(supplementStats.totalOutstanding || 0)}</p>
                 </div>
-                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
-                  <p className="text-gray-400 text-xs">Total Sales</p>
-                  <p className="text-white text-lg font-semibold">Rs.{Number(supplementStats.totalSales || 0)}</p>
+                <div className="rounded-xl border border-gray-700 bg-gray-900 px-4 py-3">
+                  <p className="text-gray-400 text-[11px] font-semibold uppercase tracking-[0.16em]">Overdue</p>
+                  <p className="mt-1 text-xl font-semibold text-red-300">{supplementStats.overdueCount}</p>
                 </div>
-                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
-                  <p className="text-gray-400 text-xs">Collected</p>
-                  <p className="text-green-400 text-lg font-semibold">Rs.{Number(supplementStats.totalCollected || 0)}</p>
-                </div>
-                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
-                  <p className="text-gray-400 text-xs">Outstanding</p>
-                  <p className="text-orange-300 text-lg font-semibold">Rs.{Number(supplementStats.totalOutstanding || 0)}</p>
-                </div>
-                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
-                  <p className="text-gray-400 text-xs">Upcoming</p>
-                  <p className="text-yellow-300 text-lg font-semibold">{supplementStats.upcomingCount}</p>
-                </div>
-                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
-                  <p className="text-gray-400 text-xs">Overdue</p>
-                  <p className="text-red-300 text-lg font-semibold">{supplementStats.overdueCount}</p>
-                </div>
-                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
-                  <p className="text-gray-400 text-xs">Due Today</p>
-                  <p className="text-blue-300 text-lg font-semibold">{supplementStats.dueTodayCount}</p>
-                </div>
-                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
-                  <p className="text-gray-400 text-xs">No Due Date</p>
-                  <p className="text-gray-200 text-lg font-semibold">{supplementStats.noDueDateCount}</p>
-                </div>
-                <div className="p-4 bg-gray-900 border border-gray-700 rounded">
-                  <p className="text-gray-400 text-xs">Fully Paid</p>
-                  <p className="text-emerald-300 text-lg font-semibold">{supplementStats.paidCount}</p>
+                <div className="rounded-xl border border-gray-700 bg-gray-900 px-4 py-3">
+                  <p className="text-gray-400 text-[11px] font-semibold uppercase tracking-[0.16em]">Due Today</p>
+                  <p className="mt-1 text-xl font-semibold text-blue-300">{supplementStats.dueTodayCount}</p>
                 </div>
               </div>
 
@@ -1020,52 +1044,59 @@ const openSupplementWhatsApp = (sale) => {
           {allTimeStatsLoading && <p className="text-gray-300">Loading...</p>}
           {!allTimeStatsLoading && allTimeMemberStats && (
             <>
-              {(!allTimeMemberStats.defaulters || allTimeMemberStats.defaulters.length === 0) ? (
+              {(defaulters.length === 0) ? (
                 <p className="text-gray-400">No defaulters right now.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm text-gray-200">
-                    <thead className="bg-gray-700 text-gray-100">
-                      <tr>
-                        <th className="px-4 py-3">Name</th>
-                        <th className="px-4 py-3">Phone</th>
-                        <th className="px-4 py-3">Due</th>
-                        <th className="px-4 py-3">Cycle End</th>
-                        <th className="px-4 py-3">Promised Date</th>
-                        <th className="px-4 py-3 text-center w-40">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allTimeMemberStats.defaulters.map((m) => (
-                        <tr key={m._id} className="border-b border-gray-700">
-                          <td className="px-4 py-3">{m.name}</td>
-                          <td className="px-4 py-3">{m.phone}</td>
-                          <td className="px-4 py-3">{m.dueAmount}</td>
-                          <td className="px-4 py-3">
-                            {m.endDate ? new Date(m.endDate).toLocaleDateString("en-GB") : "-"}
-                          </td>
-                          <td className="px-4 py-3">
-                            {m.promisedPaymentDate
-                              ? new Date(m.promisedPaymentDate).toLocaleDateString("en-GB", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                })
-                              : "-"}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => openWhatsAppReminder(m, "defaulter")}
-                              className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
-                            >
-                              WhatsApp
-                            </button>
-                          </td>
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-left text-sm text-gray-200">
+                      <thead className="bg-gray-700 text-gray-100">
+                        <tr>
+                          <th className="px-4 py-3">Name</th>
+                          <th className="px-4 py-3">Phone</th>
+                          <th className="px-4 py-3">Due</th>
+                          <th className="px-4 py-3">Cycle End</th>
+                          <th className="px-4 py-3">Promised Date</th>
+                          <th className="px-4 py-3 text-center w-40">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {pagedDefaulters.map((m) => (
+                          <tr key={m._id} className="border-b border-gray-700">
+                            <td className="px-4 py-3">{m.name}</td>
+                            <td className="px-4 py-3">{m.phone}</td>
+                            <td className="px-4 py-3">{m.dueAmount}</td>
+                            <td className="px-4 py-3">
+                              {m.endDate ? new Date(m.endDate).toLocaleDateString("en-GB") : "-"}
+                            </td>
+                            <td className="px-4 py-3">
+                              {m.promisedPaymentDate
+                                ? new Date(m.promisedPaymentDate).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })
+                                : "-"}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => openWhatsAppReminder(m, "defaulter")}
+                                className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                              >
+                                WhatsApp
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <TablePagination
+                    page={defaultersPage}
+                    totalItems={defaulters.length}
+                    onPageChange={setDefaultersPage}
+                  />
+                </>
               )}
             </>
           )}
@@ -1088,51 +1119,58 @@ const openSupplementWhatsApp = (sale) => {
               {promisedMembers.length === 0 ? (
                 <p className="text-gray-400">No promised pending members.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm text-gray-200">
-                    <thead className="bg-gray-700 text-gray-100">
-                      <tr>
-                        <th className="px-4 py-3">Name</th>
-                        <th className="px-4 py-3">Phone</th>
-                        <th className="px-4 py-3">Promise Date</th>
-                        <th className="px-4 py-3">Due</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3 text-center w-40">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {promisedMembers.map((m) => (
-                        <tr key={m._id} className="border-b border-gray-700">
-                          <td className="px-4 py-3">{m.name}</td>
-                          <td className="px-4 py-3">{m.phone}</td>
-                          <td className="px-4 py-3">
-                            {m.effectivePromiseDate
-                              ? new Date(m.effectivePromiseDate).toLocaleDateString("en-GB", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                })
-                              : "-"}
-                          </td>
-                          <td className="px-4 py-3">
-                            {m.dueNowAmount ?? m.remainingAmount ?? 0}
-                          </td>
-                          <td className="px-4 py-3">
-                            {m.displayPaymentStatus || m.paymentStatus || "-"}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => openWhatsAppReminder(m, "promised")}
-                              className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
-                            >
-                              WhatsApp
-                            </button>
-                          </td>
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-left text-sm text-gray-200">
+                      <thead className="bg-gray-700 text-gray-100">
+                        <tr>
+                          <th className="px-4 py-3">Name</th>
+                          <th className="px-4 py-3">Phone</th>
+                          <th className="px-4 py-3">Promise Date</th>
+                          <th className="px-4 py-3">Due</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3 text-center w-40">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {pagedPromisedMembers.map((m) => (
+                          <tr key={m._id} className="border-b border-gray-700">
+                            <td className="px-4 py-3">{m.name}</td>
+                            <td className="px-4 py-3">{m.phone}</td>
+                            <td className="px-4 py-3">
+                              {m.effectivePromiseDate
+                                ? new Date(m.effectivePromiseDate).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })
+                                : "-"}
+                            </td>
+                            <td className="px-4 py-3">
+                              {m.dueNowAmount ?? m.remainingAmount ?? 0}
+                            </td>
+                            <td className="px-4 py-3">
+                              {m.displayPaymentStatus || m.paymentStatus || "-"}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => openWhatsAppReminder(m, "promised")}
+                                className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                              >
+                                WhatsApp
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <TablePagination
+                    page={promisedPage}
+                    totalItems={promisedMembers.length}
+                    onPageChange={setPromisedPage}
+                  />
+                </>
               )}
             </>
           )}
@@ -1154,64 +1192,71 @@ const openSupplementWhatsApp = (sale) => {
               <p className="text-gray-300 mb-3">
                 Count: {allTimeMemberStats.dueNextWeekCount}
               </p>
-              {allTimeMemberStats.dueNextWeekMembers.length === 0 ? (
+              {dueNextWeekMembers.length === 0 ? (
                 <p className="text-gray-400">No upcoming dues in the next week.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-left text-sm text-gray-200">
-                    <thead className="bg-gray-700 text-gray-100">
-                      <tr>
-                        <th className="px-4 py-3">Name</th>
-                        <th className="px-4 py-3">Phone</th>
-                        <th className="px-4 py-3">Fee</th>
-                        <th className="px-4 py-3">Due</th>
-                        <th className="px-4 py-3">Remaining</th>
-                        <th className="px-4 py-3">Due Date</th>
-                        <th className="px-4 py-3 text-center w-40">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allTimeMemberStats.dueNextWeekMembers.map((m) => (
-                        <tr key={m._id} className="border-b border-gray-700">
-                          <td className="px-4 py-3">{m.name}</td>
-                          <td className="px-4 py-3">{m.phone}</td>
-                          <td className="px-4 py-3">
-                            {(() => {
-                              const rowRemaining = Number(m.outstandingDueAmount ?? m.remainingAmount ?? 0);
-                              const rowDue = Number(m.totalPayableAmount ?? m.dueAmount ?? m.upcomingDueAmount ?? 0);
-                              const rowFeeRaw = Number(m.nextFeeAmount ?? m.fee ?? 0);
-                              const rowFee = rowFeeRaw > 0 ? rowFeeRaw : Math.max(rowDue - rowRemaining, 0);
-                              return rowFee;
-                            })()}
-                          </td>
-                          <td className="px-4 py-3">
-                            {Number(m.totalPayableAmount ?? m.dueAmount ?? m.upcomingDueAmount ?? 0)}
-                          </td>
-                          <td className="px-4 py-3">
-                            {Number(m.outstandingDueAmount ?? m.remainingAmount ?? 0) > 0
-                              ? Number(m.outstandingDueAmount ?? m.remainingAmount ?? 0)
-                              : "-"}
-                          </td>
-                          <td className="px-4 py-3">
-                            {new Date(m.endDate).toLocaleDateString("en-GB", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <button
-                              onClick={() => openWhatsAppReminder(m, "next7")}
-                              className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
-                            >
-                              WhatsApp
-                            </button>
-                          </td>
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-left text-sm text-gray-200">
+                      <thead className="bg-gray-700 text-gray-100">
+                        <tr>
+                          <th className="px-4 py-3">Name</th>
+                          <th className="px-4 py-3">Phone</th>
+                          <th className="px-4 py-3">Fee</th>
+                          <th className="px-4 py-3">Due</th>
+                          <th className="px-4 py-3">Remaining</th>
+                          <th className="px-4 py-3">Due Date</th>
+                          <th className="px-4 py-3 text-center w-40">Action</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {pagedDueNextWeekMembers.map((m) => (
+                          <tr key={m._id} className="border-b border-gray-700">
+                            <td className="px-4 py-3">{m.name}</td>
+                            <td className="px-4 py-3">{m.phone}</td>
+                            <td className="px-4 py-3">
+                              {(() => {
+                                const rowRemaining = Number(m.outstandingDueAmount ?? m.remainingAmount ?? 0);
+                                const rowDue = Number(m.totalPayableAmount ?? m.dueAmount ?? m.upcomingDueAmount ?? 0);
+                                const rowFeeRaw = Number(m.nextFeeAmount ?? m.fee ?? 0);
+                                const rowFee = rowFeeRaw > 0 ? rowFeeRaw : Math.max(rowDue - rowRemaining, 0);
+                                return rowFee;
+                              })()}
+                            </td>
+                            <td className="px-4 py-3">
+                              {Number(m.totalPayableAmount ?? m.dueAmount ?? m.upcomingDueAmount ?? 0)}
+                            </td>
+                            <td className="px-4 py-3">
+                              {Number(m.outstandingDueAmount ?? m.remainingAmount ?? 0) > 0
+                                ? Number(m.outstandingDueAmount ?? m.remainingAmount ?? 0)
+                                : "-"}
+                            </td>
+                            <td className="px-4 py-3">
+                              {new Date(m.endDate).toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <button
+                                onClick={() => openWhatsAppReminder(m, "next7")}
+                                className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                              >
+                                WhatsApp
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <TablePagination
+                    page={dueNextWeekPage}
+                    totalItems={dueNextWeekMembers.length}
+                    onPageChange={setDueNextWeekPage}
+                  />
+                </>
               )}
             </>
           )}

@@ -4,6 +4,10 @@ import toast from "react-hot-toast";
 import { BASE_URL } from "../../utils/fetchData";
 import { LoadingButton } from "../../components";
 
+const dashboardFilterFieldClass = "flex flex-col gap-1";
+const dashboardFilterInputClass =
+  "h-10 rounded-xl border border-gray-700 bg-gray-900 px-3 text-sm text-white outline-none transition-all focus:border-blue-500";
+
 const normalizePhone = (phone) => {
   if (!phone) return "";
   let digits = String(phone).replace(/[^\d]/g, "");
@@ -319,7 +323,7 @@ const Supplements = () => {
           </div>
         </div>
 
-        <div className="mb-5 rounded-2xl bg-gray-800 px-3 py-3 space-y-3">
+        <div className="mb-5 rounded-2xl border border-gray-800 bg-gray-800/95 px-3 py-3 shadow-[0_12px_28px_rgba(0,0,0,0.18)] space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             {[
               { label: "All", value: "" },
@@ -352,8 +356,8 @@ const Supplements = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(150px,0.9fr)_minmax(150px,0.9fr)_minmax(240px,1.4fr)_auto] gap-2 border-t border-gray-700 pt-3">
-            <div className="flex flex-col">
-              <label className="text-gray-400 text-xs mb-1">Entry Start</label>
+            <div className={dashboardFilterFieldClass}>
+              <label className="text-gray-300 text-sm mb-1">Start Date</label>
               <input
                 type="date"
                 value={filters.startDate}
@@ -361,11 +365,11 @@ const Supplements = () => {
                   setPage(1);
                   setFilters((prev) => ({ ...prev, startDate: e.target.value }));
                 }}
-                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+                className={dashboardFilterInputClass}
               />
             </div>
-            <div className="flex flex-col">
-              <label className="text-gray-400 text-xs mb-1">Entry End</label>
+            <div className={dashboardFilterFieldClass}>
+              <label className="text-gray-300 text-sm mb-1">End Date</label>
               <input
                 type="date"
                 value={filters.endDate}
@@ -373,11 +377,11 @@ const Supplements = () => {
                   setPage(1);
                   setFilters((prev) => ({ ...prev, endDate: e.target.value }));
                 }}
-                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+                className={dashboardFilterInputClass}
               />
             </div>
-            <div className="flex flex-col sm:col-span-2 xl:col-span-1">
-              <label className="text-gray-400 text-xs mb-1">Search</label>
+            <div className={`${dashboardFilterFieldClass} sm:col-span-2 xl:col-span-1`}>
+              <label className="text-gray-300 text-sm mb-1">Search</label>
               <input
                 type="text"
                 value={filters.search}
@@ -386,7 +390,7 @@ const Supplements = () => {
                   setPage(1);
                   setFilters((prev) => ({ ...prev, search: e.target.value }));
                 }}
-                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+                className={dashboardFilterInputClass}
               />
             </div>
             <div className="flex items-end sm:col-span-2 xl:col-span-1">
@@ -403,7 +407,7 @@ const Supplements = () => {
                     pendingOnly: false,
                   }));
                 }}
-                className="h-10 w-full rounded-md bg-gray-700 px-4 text-sm text-white hover:bg-gray-600 transition-all whitespace-nowrap xl:w-auto"
+                className="h-10 w-full rounded-xl bg-gray-700 px-4 text-sm font-medium text-white hover:bg-gray-600 transition-all whitespace-nowrap xl:w-auto"
               >
                 Clear Filters
               </button>
