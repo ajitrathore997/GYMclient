@@ -45,6 +45,7 @@ const MembersList = () => {
   const [deletingMemberId, setDeletingMemberId] = useState("");
   const [statusUpdatingId, setStatusUpdatingId] = useState("");
   const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -61,7 +62,7 @@ const MembersList = () => {
     maxPaid: "",
     startFrom: "",
     startTo: "",
-    sortBy: "activationDate",
+    sortBy: "createdAt",
     sortOrder: "desc",
   });
 
@@ -114,6 +115,31 @@ const MembersList = () => {
   const totalPages = useMemo(() => {
     return Math.max(Math.ceil(total / limit), 1);
   }, [total, limit]);
+
+  const activeFilterCount = useMemo(() => {
+    const keys = [
+      "paymentStatus",
+      "memberStatus",
+      "reminderStatus",
+      "membershipType",
+      "personalTrainer",
+      "minRemaining",
+      "maxRemaining",
+      "minFee",
+      "maxFee",
+      "minPaid",
+      "maxPaid",
+      "startFrom",
+      "startTo",
+    ];
+
+    return keys.reduce((count, key) => {
+      const value = filters[key];
+      return value !== undefined && value !== null && String(value).trim() !== ""
+        ? count + 1
+        : count;
+    }, 0);
+  }, [filters]);
 
   const parseMonthLabel = (label) => {
     if (!label) return null;
@@ -381,7 +407,7 @@ const MembersList = () => {
       maxPaid: "",
       startFrom: "",
       startTo: "",
-      sortBy: "activationDate",
+      sortBy: "createdAt",
       sortOrder: "desc",
     });
     setPage(1);
@@ -920,168 +946,197 @@ const MembersList = () => {
           </button>
         </div>
 
-        <div className="bg-gray-800 p-4 rounded-md mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <input
-              id="search"
-              type="text"
-              placeholder="Search name/email/phone/trainer"
-              value={filters.search}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            />
-            <select
-              id="paymentStatus"
-              value={filters.paymentStatus}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            >
-              <option value="">Payment Status (All)</option>
-              <option value="Paid">Paid</option>
-              <option value="Pending">Pending</option>
-              <option value="Free Trial">Free Trial</option>
-            </select>
-            <select
-              id="memberStatus"
-              value={filters.memberStatus}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            >
-              <option value="">Member Status (All)</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-            <select
-              id="reminderStatus"
-              value={filters.reminderStatus}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            >
-              <option value="">Reminder (All)</option>
-              <option value="None">None</option>
-              <option value="Promised">Promised to Pay</option>
-            </select>
-            <select
-              id="membershipType"
-              value={filters.membershipType}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            >
-              <option value="">Membership Type (All)</option>
-              <option value="Basic">Basic</option>
-              <option value="Standard">Standard</option>
-              <option value="Premium">Premium</option>
-            </select>
-            <select
-              id="personalTrainer"
-              value={filters.personalTrainer}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            >
-              <option value="">Trainer (All)</option>
-              <option value="Assigned">Assigned</option>
-              <option value="Not Assigned">Not Assigned</option>
-            </select>
-
-            <input
-              id="minFee"
-              type="number"
-              placeholder="Min Fee"
-              value={filters.minFee}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            />
-            <input
-              id="maxFee"
-              type="number"
-              placeholder="Max Fee"
-              value={filters.maxFee}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            />
-            <input
-              id="minPaid"
-              type="number"
-              placeholder="Min Paid"
-              value={filters.minPaid}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            />
-            <input
-              id="maxPaid"
-              type="number"
-              placeholder="Max Paid"
-              value={filters.maxPaid}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            />
-
-            <input
-              id="minRemaining"
-              type="number"
-              placeholder="Min Remaining"
-              value={filters.minRemaining}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            />
-            <input
-              id="maxRemaining"
-              type="number"
-              placeholder="Max Remaining"
-              value={filters.maxRemaining}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            />
-            <input
-              id="startFrom"
-              type="date"
-              value={filters.startFrom}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            />
-            <input
-              id="startTo"
-              type="date"
-              value={filters.startTo}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            />
-
-            <select
-              id="sortBy"
-              value={filters.sortBy}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            >
-              <option value="createdAt">Entry Date</option>
-              <option value="name">Name</option>
-              <option value="fee">Fee</option>
-              <option value="paidAmount">Paid</option>
-              <option value="remainingAmount">Outstanding</option>
-              <option value="activationDate">Activation Date</option>
-            </select>
-            <select
-              id="sortOrder"
-              value={filters.sortOrder}
-              onChange={handleFilterChange}
-              className="p-2 rounded-md outline-none w-full"
-            >
-              <option value="desc">Sort Order (Desc)</option>
-              <option value="asc">Asc</option>
-            </select>
-          </div>
-
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-gray-200 text-sm">
-              Total: {total}
+        <div className="bg-gray-800 p-3 rounded-md mb-6 space-y-3">
+          <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
+            <div className="grid w-full xl:flex-1 grid-cols-2 gap-2 lg:grid-cols-[minmax(260px,2fr)_minmax(170px,1fr)_minmax(130px,0.8fr)_minmax(120px,0.8fr)]">
+              <input
+                id="search"
+                type="text"
+                placeholder="Search name/email/phone/trainer"
+                value={filters.search}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm col-span-2 lg:col-span-1"
+              />
+              <select
+                id="sortBy"
+                value={filters.sortBy}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              >
+                <option value="createdAt">Entry Date</option>
+                <option value="name">Name</option>
+                <option value="fee">Fee</option>
+                <option value="paidAmount">Paid</option>
+                <option value="remainingAmount">Outstanding</option>
+                <option value="activationDate">Activation Date</option>
+              </select>
+              <select
+                id="sortOrder"
+                value={filters.sortOrder}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              >
+                <option value="desc">Desc</option>
+                <option value="asc">Asc</option>
+              </select>
+              <select
+                id="limit"
+                value={limit}
+                onChange={(e) => {
+                  setPage(1);
+                  setLimit(Number(e.target.value) || 20);
+                }}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              >
+                <option value={20}>20 / page</option>
+                <option value={50}>50 / page</option>
+                <option value={100}>100 / page</option>
+              </select>
             </div>
-            <div className="space-x-2">
+
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+              <button
+                type="button"
+                onClick={() => setIsFiltersOpen((prev) => !prev)}
+                className="h-10 rounded bg-gray-700 px-3 text-sm text-white hover:bg-gray-600 transition-all whitespace-nowrap"
+              >
+                {isFiltersOpen ? "Hide Filters" : "Filters"}
+                {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+              </button>
               <button
                 onClick={resetFilters}
-                className="px-3 py-1 rounded bg-gray-700 text-white hover:bg-gray-600 transition-all"
+                className="h-10 rounded bg-gray-700 px-3 text-sm text-white hover:bg-gray-600 transition-all whitespace-nowrap"
               >
                 Reset
               </button>
+            </div>
+          </div>
+
+          {isFiltersOpen && (
+            <div className="grid grid-cols-2 gap-2 border-t border-gray-700 pt-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+              <select
+                id="paymentStatus"
+                value={filters.paymentStatus}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              >
+                <option value="">Payment Status</option>
+                <option value="Paid">Paid</option>
+                <option value="Pending">Pending</option>
+                <option value="Free Trial">Free Trial</option>
+              </select>
+              <select
+                id="memberStatus"
+                value={filters.memberStatus}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              >
+                <option value="">Member Status</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+              <select
+                id="reminderStatus"
+                value={filters.reminderStatus}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              >
+                <option value="">Reminder</option>
+                <option value="None">None</option>
+                <option value="Promised">Promised</option>
+              </select>
+              <select
+                id="membershipType"
+                value={filters.membershipType}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              >
+                <option value="">Membership</option>
+                <option value="Basic">Basic</option>
+                <option value="Standard">Standard</option>
+                <option value="Premium">Premium</option>
+              </select>
+              <select
+                id="personalTrainer"
+                value={filters.personalTrainer}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              >
+                <option value="">Trainer</option>
+                <option value="Assigned">Assigned</option>
+                <option value="Not Assigned">Not Assigned</option>
+              </select>
+              <input
+                id="minFee"
+                type="number"
+                placeholder="Min Fee"
+                value={filters.minFee}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              />
+              <input
+                id="maxFee"
+                type="number"
+                placeholder="Max Fee"
+                value={filters.maxFee}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              />
+              <input
+                id="minPaid"
+                type="number"
+                placeholder="Min Paid"
+                value={filters.minPaid}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              />
+              <input
+                id="maxPaid"
+                type="number"
+                placeholder="Max Paid"
+                value={filters.maxPaid}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              />
+              <input
+                id="minRemaining"
+                type="number"
+                placeholder="Min Due"
+                value={filters.minRemaining}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              />
+              <input
+                id="maxRemaining"
+                type="number"
+                placeholder="Max Due"
+                value={filters.maxRemaining}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              />
+              <input
+                id="startFrom"
+                type="date"
+                value={filters.startFrom}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              />
+              <input
+                id="startTo"
+                type="date"
+                value={filters.startTo}
+                onChange={handleFilterChange}
+                className="h-10 rounded-md px-3 outline-none w-full text-sm"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-1">
+            <div className="text-gray-200 text-sm">Total: {total}</div>
+            <div className="text-gray-400 text-sm">
+              {activeFilterCount > 0
+                ? `${activeFilterCount} filter${activeFilterCount > 1 ? "s" : ""} active`
+                : "No extra filters"}
             </div>
           </div>
         </div>

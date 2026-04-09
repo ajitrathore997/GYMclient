@@ -906,29 +906,6 @@ const openSupplementWhatsApp = (sale) => {
             )}
           </div>
 
-          <div className="bg-gray-800 p-5 border border-white" data-aos="fade-up" data-aos-delay="100">
-            <h3 className="text-white text-xl font-semibold mb-4">Membership Types</h3>
-            {statsLoading && <p className="text-gray-300">Loading...</p>}
-            {!statsLoading && memberStats && (
-              <div className="space-y-3">
-                {Object.entries(memberStats.membershipTypeCounts).map(([label, value]) => {
-                  const max = Math.max(...Object.values(memberStats.membershipTypeCounts), 1);
-                  const width = Math.round((value / max) * 100);
-                  return (
-                    <div key={label}>
-                      <div className="flex justify-between text-gray-300 text-sm mb-1">
-                        <span>{label}</span>
-                        <span>{value}</span>
-                      </div>
-                      <div className="h-3 bg-gray-700 rounded">
-                        <div className="h-3 bg-green-500 rounded" style={{ width: `${width}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
 
         <div className="bg-gray-800 p-5 border border-white mt-10" data-aos="fade-up">
