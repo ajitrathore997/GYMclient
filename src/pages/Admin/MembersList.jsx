@@ -193,7 +193,29 @@ const MembersList = () => {
       const endMonth = new Date(e.getFullYear(), e.getMonth(), 1);
       return target >= startMonth && target < endMonth;
     });
-    return Number(cycle?.fee ?? member?.fee ?? 0);
+    if (cycle) {
+      const cycleStart = cycle?.startDate ? new Date(cycle.startDate) : null;
+      if (!cycleStart || Number.isNaN(cycleStart.getTime())) {
+        return Number(cycle?.fee ?? member?.fee ?? 0);
+      }
+      const cycleStartMonth = new Date(cycleStart.getFullYear(), cycleStart.getMonth(), 1);
+      return target.getTime() === cycleStartMonth.getTime()
+        ? Number(cycle?.fee ?? member?.fee ?? 0)
+        : 0;
+    }
+
+    const activationBase = member?.activationDate || member?.startDate;
+    if (activationBase) {
+      const activation = new Date(activationBase);
+      if (!Number.isNaN(activation.getTime())) {
+        const activationMonth = new Date(activation.getFullYear(), activation.getMonth(), 1);
+        return target.getTime() === activationMonth.getTime()
+          ? Number(member?.fee || 0)
+          : 0;
+      }
+    }
+
+    return Number(member?.fee || 0);
   };
 
   const getMonthPaymentSummary = (member, monthLabel) => {
