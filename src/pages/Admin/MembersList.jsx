@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { BASE_URL } from "../../utils/fetchData";
+import { BASE_URL, resolveMediaUrl } from "../../utils/fetchData";
 import { jsPDF } from "jspdf";
 
 const MembersList = () => {
@@ -1118,7 +1118,7 @@ const MembersList = () => {
                     <td className="px-4 py-3">
                       {m.profilePic ? (
                         <img
-                          src={m.profilePic}
+                          src={resolveMediaUrl(m.profilePic)}
                           alt={m.name}
                           className="w-10 h-10 rounded-full object-cover"
                         />

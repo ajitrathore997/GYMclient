@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { BASE_URL } from "../../utils/fetchData";
+import { BASE_URL, resolveMediaUrl } from "../../utils/fetchData";
 import { LoadingButton } from "../../components";
 
 const EditMember = () => {
@@ -402,7 +402,7 @@ const EditMember = () => {
             {uploading && <span className="text-xs text-gray-300 mt-1">Uploading...</span>}
             {member.profilePic && (
               <img
-                src={member.profilePic}
+                src={resolveMediaUrl(member.profilePic)}
                 alt="Profile"
                 className="mt-2 w-24 h-24 object-cover rounded"
               />

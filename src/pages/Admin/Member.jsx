@@ -3,7 +3,7 @@ import { useAuth } from "../../context/auth";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { BASE_URL } from "../../utils/fetchData";
+import { BASE_URL, resolveMediaUrl } from "../../utils/fetchData";
 import { LoadingButton } from "../../components";
 
 const AddMember = () => {
@@ -28,9 +28,7 @@ const AddMember = () => {
     duration: "1 Month",
     fee: 0,
     paidAmount: 0,
-    paymentMode: "Cash",
     remainingAmount: 0,
-    paymentStatus: "Paid",
     memberStatus: "Active",
     reminderStatus: "None",
     personalTrainer: "Not Assigned",
@@ -50,13 +48,10 @@ const AddMember = () => {
   const handleChange = (e) => {
     const { id, value } = e.target;
     const nextMember = { ...member, [id]: value };
-    if (id === "fee" || id === "paidAmount") {
-      const fee = Number(id === "fee" ? value : nextMember.fee || 0);
-      const paid = Number(id === "paidAmount" ? value : nextMember.paidAmount || 0);
+    if (id === "fee") {
+      const fee = Number(value || 0);
+      const paid = Number(nextMember.paidAmount || 0);
       nextMember.remainingAmount = Math.max(fee - paid, 0);
-      if (!(nextMember.paymentStatus === "Free Trial" && fee === 0)) {
-        nextMember.paymentStatus = nextMember.remainingAmount === 0 ? "Paid" : "Pending";
-      }
     }
     if (id === "activationDate") {
       nextMember.startDate = value;
@@ -231,7 +226,7 @@ const AddMember = () => {
             {uploading && <span className="text-xs text-gray-300 mt-1">Uploading...</span>}
             {member.profilePic && (
               <img
-                src={member.profilePic}
+                src={resolveMediaUrl(member.profilePic)}
                 alt="Profile"
                 className="mt-2 w-24 h-24 object-cover rounded"
               />
@@ -277,34 +272,6 @@ const AddMember = () => {
           </div>
 
           <div className="flex flex-col">
-            <label className="text-white font-bold mb-1">Paid Amount</label>
-            <input
-              type="number"
-              placeholder="Paid Amount"
-              id="paidAmount"
-              value={member.paidAmount}
-              onChange={handleChange}
-              className="p-3 rounded-md outline-none w-full"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-white font-bold mb-1">Payment Mode</label>
-            <select
-              id="paymentMode"
-              value={member.paymentMode}
-              onChange={handleChange}
-              className="p-3 rounded-md outline-none w-full"
-            >
-              <option>Cash</option>
-              <option>UPI</option>
-              <option>Card</option>
-              <option>Bank Transfer</option>
-              <option>Other</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col">
             <label className="text-white font-bold mb-1">Remaining Amount</label>
             <input
               type="number"
@@ -313,20 +280,6 @@ const AddMember = () => {
               readOnly
               className="p-3 rounded-md outline-none w-full bg-gray-200"
             />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-white font-bold mb-1">Payment Status</label>
-            <select
-              id="paymentStatus"
-              value={member.paymentStatus}
-              onChange={handleChange}
-              className="p-3 rounded-md outline-none w-full"
-            >
-              <option>Paid</option>
-              <option>Pending</option>
-              <option>Free Trial</option>
-            </select>
           </div>
 
           {/* Personal Trainer */}
