@@ -160,7 +160,7 @@ import { Link } from 'react-router-dom';
 import axios from "axios";
 import { Loader } from '../../components';
 import { toast } from "react-hot-toast";
-import { BASE_URL } from "../../utils/fetchData";
+import { BASE_URL, resolveMediaUrl } from "../../utils/fetchData";
 import AOS from 'aos';
 import 'aos/dist/aos.css'; // Import AOS styles
 import { BarChart } from "@mui/x-charts/BarChart";
@@ -231,6 +231,7 @@ const AdminDashBoard = () => {
   const [defaultersPage, setDefaultersPage] = useState(1);
   const [promisedPage, setPromisedPage] = useState(1);
   const [dueNextWeekPage, setDueNextWeekPage] = useState(1);
+  const [statusUpdatingId, setStatusUpdatingId] = useState("");
 
   const defaulters = allTimeMemberStats?.defaulters || [];
   const dueNextWeekMembers = allTimeMemberStats?.dueNextWeekMembers || [];
@@ -484,6 +485,30 @@ const AdminDashBoard = () => {
     ]);
   };
 
+  const updateMemberStatus = async (member, nextStatus) => {
+    if (!member?._id) {
+      toast.error("Unable to update member status");
+      return;
+    }
+
+    try {
+      setStatusUpdatingId(member._id);
+      const res = await axios.put(`${BASE_URL}/api/v1/members/${member._id}/status`, {
+        memberStatus: nextStatus,
+      });
+      if (res.data?.success) {
+        toast.success(res.data.message || "Member status updated");
+        await getAllTimeMemberStats();
+      } else {
+        toast.error(res.data?.message || "Failed to update member status");
+      }
+    } catch (err) {
+      console.log(err);
+      toast.error(err.response?.data?.message || "Failed to update member status");
+    } finally {
+      setStatusUpdatingId("");
+    }
+  };
 
   const normalizePhone = (phone) => {
     if (!phone) return "";
@@ -1052,6 +1077,7 @@ const openSupplementWhatsApp = (sale) => {
                     <table className="min-w-full text-left text-sm text-gray-200">
                       <thead className="bg-gray-700 text-gray-100">
                         <tr>
+                          <th className="px-4 py-3">Profile</th>
                           <th className="px-4 py-3">Name</th>
                           <th className="px-4 py-3">Phone</th>
                           <th className="px-4 py-3">Due</th>
@@ -1063,6 +1089,19 @@ const openSupplementWhatsApp = (sale) => {
                       <tbody>
                         {pagedDefaulters.map((m) => (
                           <tr key={m._id} className="border-b border-gray-700">
+                            <td className="px-4 py-3">
+                              {m?.profilePic ? (
+                                <img
+                                  src={resolveMediaUrl(m?.profilePic)}
+                                  alt={m.name}
+                                  className="w-10 h-10 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-xs text-gray-300">
+                                  N/A
+                                </div>
+                              )}
+                            </td>
                             <td className="px-4 py-3">{m.name}</td>
                             <td className="px-4 py-3">{m.phone}</td>
                             <td className="px-4 py-3">{m.dueAmount}</td>
@@ -1078,12 +1117,23 @@ const openSupplementWhatsApp = (sale) => {
                                   })
                                 : "-"}
                             </td>
-                            <td className="px-4 py-3 text-center">
+                            <td className="px-4 py-3 text-center space-x-2">
                               <button
                                 onClick={() => openWhatsAppReminder(m, "defaulter")}
                                 className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
                               >
                                 WhatsApp
+                              </button>
+                              <button
+                                onClick={() => updateMemberStatus(m, m.memberStatus === "Inactive" ? "Active" : "Inactive")}
+                                disabled={statusUpdatingId === m._id}
+                                className="inline-flex items-center justify-center min-w-[110px] px-3 py-1 rounded bg-orange-600 text-white hover:bg-orange-500 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {statusUpdatingId === m._id
+                                  ? "Updating..."
+                                  : m.memberStatus === "Inactive"
+                                  ? "Mark Active"
+                                  : "Mark Inactive"}
                               </button>
                             </td>
                           </tr>
@@ -1124,6 +1174,7 @@ const openSupplementWhatsApp = (sale) => {
                     <table className="min-w-full text-left text-sm text-gray-200">
                       <thead className="bg-gray-700 text-gray-100">
                         <tr>
+                          <th className="px-4 py-3">Profile</th>
                           <th className="px-4 py-3">Name</th>
                           <th className="px-4 py-3">Phone</th>
                           <th className="px-4 py-3">Promise Date</th>
@@ -1135,6 +1186,19 @@ const openSupplementWhatsApp = (sale) => {
                       <tbody>
                         {pagedPromisedMembers.map((m) => (
                           <tr key={m._id} className="border-b border-gray-700">
+                            <td className="px-4 py-3">
+                              {m?.profilePic ? (
+                                <img
+                                  src={resolveMediaUrl(m?.profilePic)}
+                                  alt={m.name}
+                                  className="w-10 h-10 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-xs text-gray-300">
+                                  N/A
+                                </div>
+                              )}
+                            </td>
                             <td className="px-4 py-3">{m.name}</td>
                             <td className="px-4 py-3">{m.phone}</td>
                             <td className="px-4 py-3">
@@ -1200,6 +1264,7 @@ const openSupplementWhatsApp = (sale) => {
                     <table className="min-w-full text-left text-sm text-gray-200">
                       <thead className="bg-gray-700 text-gray-100">
                         <tr>
+                          <th className="px-4 py-3">Profile</th>
                           <th className="px-4 py-3">Name</th>
                           <th className="px-4 py-3">Phone</th>
                           <th className="px-4 py-3">Fee</th>
@@ -1212,6 +1277,19 @@ const openSupplementWhatsApp = (sale) => {
                       <tbody>
                         {pagedDueNextWeekMembers.map((m) => (
                           <tr key={m._id} className="border-b border-gray-700">
+                            <td className="px-4 py-3">
+                              {m?.profilePic ? (
+                                <img
+                                  src={resolveMediaUrl(m?.profilePic)}
+                                  alt={m.name}
+                                  className="w-10 h-10 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-xs text-gray-300">
+                                  N/A
+                                </div>
+                              )}
+                            </td>
                             <td className="px-4 py-3">{m.name}</td>
                             <td className="px-4 py-3">{m.phone}</td>
                             <td className="px-4 py-3">
