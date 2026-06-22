@@ -21,6 +21,9 @@ const EditMember = () => {
   const [extendDays, setExtendDays] = useState("");
   const [originalMemberStatus, setOriginalMemberStatus] = useState("Active");
   const [originalActivationDate, setOriginalActivationDate] = useState("");
+  const [originalPTStatus, setOriginalPTStatus] = useState("Inactive");
+  const [originalPTStartDate, setOriginalPTStartDate] = useState("");
+  const [originalPTFee, setOriginalPTFee] = useState(0);
 
   const [member, setMember] = useState({
     name: "",
@@ -44,6 +47,9 @@ const EditMember = () => {
     reminderStatus: "None",
     personalTrainer: "Not Assigned",
     assignedTrainer: "",
+    ptStatus: "Inactive",
+    ptStartDate: "",
+    ptFee: 0,
     profilePic: "",
   });
 
@@ -65,6 +71,9 @@ const EditMember = () => {
     }
     if (id === "startDate") {
       nextMember.activationDate = value;
+    }
+    if (id === "ptStatus" && value === "Active") {
+      nextMember.ptStartDate = new Date().toISOString().slice(0, 10);
     }
     setMember(nextMember);
   };
@@ -111,6 +120,9 @@ const EditMember = () => {
           reminderStatus: m.reminderStatus || "None",
           personalTrainer: m.personalTrainer || "Not Assigned",
           assignedTrainer: m.assignedTrainer || "",
+          ptStatus: m.ptStatus || "Inactive",
+          ptStartDate: m.ptStartDate ? new Date(m.ptStartDate).toISOString().slice(0, 10) : "",
+          ptFee: m.ptFee || 0,
           profilePic: m.profilePic || "",
         });
         setOriginalMemberStatus(m.memberStatus || "Active");
@@ -119,6 +131,9 @@ const EditMember = () => {
             ? new Date(m.activationDate).toISOString().slice(0, 10)
             : (m.startDate ? new Date(m.startDate).toISOString().slice(0, 10) : "")
         );
+        setOriginalPTStatus(m.ptStatus || "Inactive");
+        setOriginalPTStartDate(m.ptStartDate ? new Date(m.ptStartDate).toISOString().slice(0, 10) : "");
+        setOriginalPTFee(Number(m.ptFee || 0));
       } else {
         setError(res.data?.message || "Failed to load member");
       }
@@ -139,6 +154,30 @@ const EditMember = () => {
     setError("");
     try {
       const payload = { ...member };
+      if (payload.ptStatus === "Active" && !payload.ptStartDate) {
+        toast.error("Please select PT start date");
+        setSubmitting(false);
+        return;
+      }
+      const ptChanged =
+        payload.ptStatus !== originalPTStatus ||
+        payload.ptStartDate !== originalPTStartDate ||
+        Number(payload.ptFee || 0) !== Number(originalPTFee || 0);
+      if (ptChanged) {
+        const ptRes = await axios.put(`${BASE_URL}/api/v1/members/${id}/pt-status`, {
+          ptStatus: payload.ptStatus,
+          ptStartDate: payload.ptStartDate,
+          ptFee: Number(payload.ptFee || 0),
+        });
+        if (!ptRes.data?.success) {
+          setError(ptRes.data?.message || "Failed to update PT");
+          setSubmitting(false);
+          return;
+        }
+        setOriginalPTStatus(payload.ptStatus);
+        setOriginalPTStartDate(payload.ptStartDate);
+        setOriginalPTFee(Number(payload.ptFee || 0));
+      }
       if (member.memberStatus !== originalMemberStatus) {
         const statusRes = await axios.put(`${BASE_URL}/api/v1/members/${id}/status`, {
           memberStatus: member.memberStatus,
@@ -158,6 +197,9 @@ const EditMember = () => {
         delete payload.remainingAmount;
         delete payload.paymentStatus;
       }
+      delete payload.ptStatus;
+      delete payload.ptStartDate;
+      delete payload.ptFee;
       payload.startDate = payload.activationDate || payload.startDate;
       payload.realignCyclesOnActivationChange =
         Boolean(payload.activationDate) &&
@@ -562,6 +604,43 @@ const EditMember = () => {
             onChange={handleChange}
             className="p-3 rounded-md outline-none w-full"
           />
+
+          <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">PT Status</label>
+            <select
+              id="ptStatus"
+              value={member.ptStatus}
+              onChange={handleChange}
+              className="p-3 rounded-md outline-none w-full"
+            >
+              <option value="Inactive">Inactive</option>
+              <option value="Active">Active</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">PT Start Date</label>
+            <input
+              type="date"
+              id="ptStartDate"
+              value={member.ptStartDate}
+              onChange={handleChange}
+              className="p-3 rounded-md outline-none w-full"
+              disabled={member.ptStatus !== "Active"}
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-white font-bold mb-1">PT Monthly Fee</label>
+            <input
+              type="number"
+              id="ptFee"
+              value={member.ptFee}
+              onChange={handleChange}
+              className="p-3 rounded-md outline-none w-full"
+              min="0"
+            />
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex flex-col">

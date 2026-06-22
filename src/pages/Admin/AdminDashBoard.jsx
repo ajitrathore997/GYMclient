@@ -234,6 +234,7 @@ const AdminDashBoard = () => {
   const [statusUpdatingId, setStatusUpdatingId] = useState("");
 
   const defaulters = allTimeMemberStats?.defaulters || [];
+  const ptDefaulters = allTimeMemberStats?.ptDefaulters || [];
   const dueNextWeekMembers = allTimeMemberStats?.dueNextWeekMembers || [];
 
   const pagedDefaulters = useMemo(() => {
@@ -740,6 +741,33 @@ const openSupplementWhatsApp = (sale) => {
 
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-10">
           <div className={dashboardCardClass} data-aos="fade-up">
+            <p className={dashboardCardLabelClass}>PT Active Members</p>
+            <h3 className="mt-2 text-2xl font-semibold text-cyan-300">
+              {allTimeMemberStats ? allTimeMemberStats.ptActiveMembersCount : "Loading..."}
+            </h3>
+          </div>
+          <div className={dashboardCardClass} data-aos="fade-up" data-aos-delay="100">
+            <p className={dashboardCardLabelClass}>PT Pending</p>
+            <h3 className="mt-2 text-2xl font-semibold text-orange-300">
+              {allTimeMemberStats ? allTimeMemberStats.ptPendingCount : "Loading..."}
+            </h3>
+          </div>
+          <div className={dashboardCardClass} data-aos="fade-up" data-aos-delay="200">
+            <p className={dashboardCardLabelClass}>PT Due</p>
+            <h3 className="mt-2 text-2xl font-semibold text-rose-300">
+              {allTimeMemberStats ? allTimeMemberStats.ptTotalDueNow : "Loading..."}
+            </h3>
+          </div>
+          <div className={dashboardCardClass} data-aos="fade-up" data-aos-delay="300">
+            <p className={dashboardCardLabelClass}>PT Paid</p>
+            <h3 className="mt-2 text-2xl font-semibold text-emerald-300">
+              {allTimeMemberStats ? allTimeMemberStats.ptTotalPaid : "Loading..."}
+            </h3>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-10">
+          <div className={dashboardCardClass} data-aos="fade-up">
             <p className={dashboardCardLabelClass}>Paid In Range</p>
             <h3 className="mt-2 text-2xl font-semibold text-emerald-300">
               {memberStats ? memberStats.paidInRange : "Loading..."}
@@ -1235,6 +1263,54 @@ const openSupplementWhatsApp = (sale) => {
                     onPageChange={setPromisedPage}
                   />
                 </>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="bg-gray-800 p-5 border border-white mt-10" data-aos="fade-up">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-white text-xl font-semibold">PT Pending</h3>
+            <Link
+              to="/dashboard/admin/members"
+              className="text-sm text-yellow-400 hover:underline"
+            >
+              View Members
+            </Link>
+          </div>
+          {allTimeStatsLoading && <p className="text-gray-300">Loading...</p>}
+          {!allTimeStatsLoading && allTimeMemberStats && (
+            <>
+              <p className="text-gray-300 mb-3">Count: {ptDefaulters.length}</p>
+              {ptDefaulters.length === 0 ? (
+                <p className="text-gray-400">No PT pending members.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-sm text-gray-200">
+                    <thead className="bg-gray-700 text-gray-100">
+                      <tr>
+                        <th className="px-4 py-3">Name</th>
+                        <th className="px-4 py-3">Phone</th>
+                        <th className="px-4 py-3">PT Due</th>
+                        <th className="px-4 py-3">PT End</th>
+                        <th className="px-4 py-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ptDefaulters.slice(0, 10).map((m) => (
+                        <tr key={m._id} className="border-b border-gray-700">
+                          <td className="px-4 py-3">{m.name}</td>
+                          <td className="px-4 py-3">{m.phone}</td>
+                          <td className="px-4 py-3">{Number(m.dueAmount || 0)}</td>
+                          <td className="px-4 py-3">
+                            {m.endDate ? new Date(m.endDate).toLocaleDateString("en-GB") : "-"}
+                          </td>
+                          <td className="px-4 py-3">{m.status || "Pending"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </>
           )}

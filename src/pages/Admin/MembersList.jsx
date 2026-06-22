@@ -41,6 +41,16 @@ const MembersList = () => {
   const [payMode, setPayMode] = useState("Cash");
   const [promiseDate, setPromiseDate] = useState("");
   const [payMonthOptions, setPayMonthOptions] = useState([]);
+  const [isPTPayOpen, setIsPTPayOpen] = useState(false);
+  const [ptPayMember, setPTPayMember] = useState(null);
+  const [ptPayAmount, setPTPayAmount] = useState("");
+  const [ptPayNote, setPTPayNote] = useState("");
+  const [ptPayDate, setPTPayDate] = useState("");
+  const [ptPayMode, setPTPayMode] = useState("Cash");
+  const [ptPayMonth, setPTPayMonth] = useState("");
+  const [ptPayMonthOptions, setPTPayMonthOptions] = useState([]);
+  const [ptPromiseDate, setPTPromiseDate] = useState("");
+  const [submittingPTPayment, setSubmittingPTPayment] = useState(false);
   const [listType, setListType] = useState("all");
   const [deletingMemberId, setDeletingMemberId] = useState("");
   const [statusUpdatingId, setStatusUpdatingId] = useState("");
@@ -176,6 +186,24 @@ const MembersList = () => {
     return out;
   };
 
+  const buildPTMonthOptionsForMember = (member) => {
+    const now = new Date();
+    const activation = member?.ptStartDate || member?.activationDate || member?.startDate;
+    const start = activation ? new Date(activation) : new Date(now.getFullYear(), now.getMonth() - 24, 1);
+    if (Number.isNaN(start.getTime())) {
+      return [];
+    }
+    const startMonth = new Date(start.getFullYear(), start.getMonth(), 1);
+    const horizon = new Date(now.getFullYear(), now.getMonth() + 12, 1);
+    const out = [];
+    const cursor = new Date(startMonth);
+    while (cursor <= horizon) {
+      out.push(formatMonthLabel(cursor));
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+    return out;
+  };
+
   const getSelectedMonthCycleDue = (member, monthLabel) => {
     if (!member || !monthLabel) return null;
     const target = parseMonthLabel(monthLabel);
@@ -244,6 +272,53 @@ const MembersList = () => {
     return Number(member?.fee || 0);
   };
 
+  const getPTSelectedMonthCycleDue = (member, monthLabel) => {
+    if (!member || !monthLabel) return null;
+    const target = parseMonthLabel(monthLabel);
+    if (!target) return null;
+    const activationBase = member.ptStartDate || member.activationDate || member.startDate;
+    if (activationBase) {
+      const activation = new Date(activationBase);
+      if (!Number.isNaN(activation.getTime())) {
+        const activationMonth = new Date(activation.getFullYear(), activation.getMonth(), 1);
+        if (target < activationMonth) {
+          return null;
+        }
+      }
+    }
+    const cycles = Array.isArray(member.ptPaymentCycles) ? member.ptPaymentCycles : [];
+    const cycle = cycles.find((c) => {
+      const s = c?.startDate ? new Date(c.startDate) : null;
+      const e = c?.endDate ? new Date(c.endDate) : null;
+      if (!s || !e || Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return false;
+      const startMonth = new Date(s.getFullYear(), s.getMonth(), 1);
+      const endMonth = new Date(e.getFullYear(), e.getMonth(), 1);
+      return target >= startMonth && target < endMonth;
+    });
+    if (cycle) return Number(cycle.remainingAmount || 0);
+    return Number(member.ptFee || 0);
+  };
+
+  const getPTExpectedFeeForMonth = (member, monthLabel) => {
+    if (!member || !monthLabel) return Number(member?.ptFee || 0);
+    const target = parseMonthLabel(monthLabel);
+    if (!target) return Number(member?.ptFee || 0);
+    const cycles = Array.isArray(member.ptPaymentCycles) ? member.ptPaymentCycles : [];
+    const cycle = cycles.find((c) => {
+      const s = c?.startDate ? new Date(c.startDate) : null;
+      const e = c?.endDate ? new Date(c.endDate) : null;
+      if (!s || !e || Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return false;
+      const startMonth = new Date(s.getFullYear(), s.getMonth(), 1);
+      const endMonth = new Date(e.getFullYear(), e.getMonth(), 1);
+      return target >= startMonth && target < endMonth;
+    });
+    if (cycle) {
+      const cycleStart = cycle?.startDate ? new Date(cycle.startDate) : null;
+      return Number(cycle?.fee || (cycleStart ? member.ptFee || 0 : 0));
+    }
+    return Number(member.ptFee || 0);
+  };
+
   const getMonthPaymentSummary = (member, monthLabel) => {
     const expectedFee = Number(getExpectedFeeForMonth(member, monthLabel) || 0);
     const history = Array.isArray(member?.paymentHistory) ? member.paymentHistory : [];
@@ -275,10 +350,16 @@ const MembersList = () => {
 
   const getMemberOutstanding = (member) =>
     Number(
-      member?.dueNowAmount ??
-        member?.remainingAmount ??
+      member?.dueNowAmount ?? 
+        member?.remainingAmount ?? 
         Math.max((member?.fee || 0) - (member?.paidAmount || 0), 0)
     );
+
+  const getPTMemberOutstanding = (member) =>
+    Number(member?.ptDueNowAmount ?? member?.ptRemainingAmount ?? 0);
+
+  const getCombinedOutstanding = (member) =>
+    getMemberOutstanding(member) + getPTMemberOutstanding(member);
 
   const buildMemberLedger = (member) => {
     if (!member) return [];
@@ -385,6 +466,15 @@ const MembersList = () => {
     };
   };
 
+  const getPTPayTargetMonth = (member, options = []) => {
+    const currentMonth = new Date().toLocaleString(undefined, {
+      month: "long",
+      year: "numeric",
+    });
+    if (options.includes(currentMonth)) return currentMonth;
+    return options[options.length - 1] || "";
+  };
+
   const handleFilterChange = (e) => {
     const { id, value } = e.target;
     setPage(1);
@@ -441,6 +531,19 @@ const MembersList = () => {
     setIsPayOpen(true);
   };
 
+  const openPTPay = (member) => {
+    setPTPayMember(member);
+    setPTPayAmount("");
+    setPTPayNote("");
+    setPTPayMode("Cash");
+    setPTPayDate(new Date().toISOString().slice(0, 10));
+    setPTPromiseDate("");
+    const options = buildPTMonthOptionsForMember(member);
+    setPTPayMonthOptions(options);
+    setPTPayMonth(getPTPayTargetMonth(member, options));
+    setIsPTPayOpen(true);
+  };
+
   const openCycles = (member) => {
     setSelectedMember(member);
     setIsCycleOpen(true);
@@ -461,6 +564,18 @@ const MembersList = () => {
     setPayMode("Cash");
     setPromiseDate("");
     setPayMonthOptions([]);
+  };
+
+  const closePTPay = () => {
+    setIsPTPayOpen(false);
+    setPTPayMember(null);
+    setPTPayAmount("");
+    setPTPayNote("");
+    setPTPayDate("");
+    setPTPayMode("Cash");
+    setPTPayMonth("");
+    setPTPayMonthOptions([]);
+    setPTPromiseDate("");
   };
 
   const openMember360 = async (member) => {
@@ -579,10 +694,15 @@ const MembersList = () => {
   const paymentDate = formatDateTime(payment.at);
   const receivedBy = payment.by?.name || "Unknown";
 
-  const cycles = Array.isArray(member.paymentCycles) ? member.paymentCycles : [];
+  const isPTPayment = payment?.kind === "pt";
+  const cycles = isPTPayment
+    ? Array.isArray(member.ptPaymentCycles) ? member.ptPaymentCycles : []
+    : Array.isArray(member.paymentCycles) ? member.paymentCycles : [];
   const currentCycle = cycles.length ? cycles[cycles.length - 1] : null;
 
-  const totalOutstanding = getMemberOutstanding(member);
+  const totalOutstanding = isPTPayment
+    ? getPTMemberOutstanding(member)
+    : getMemberOutstanding(member);
   const currentRemaining = currentCycle
     ? Number(currentCycle.remainingAmount || 0)
     : 0;
@@ -619,6 +739,7 @@ const MembersList = () => {
   y += 6;
 
   doc.setFont("helvetica", "normal");
+  labelValue("Type:", isPTPayment ? "PT" : "Membership");
   labelValue("Cycle Period:", cycleLabel);
   labelValue("Payment Mode:", payment.paymentMode || "-");
   labelValue("Amount Paid:", `Rs.${payment.amount ?? 0}`);
@@ -667,6 +788,17 @@ const MembersList = () => {
     return digits;
   };
 
+  const getPaymentKindLabel = (payment) => {
+    if (payment?.kind === "pt") return "PT";
+    return "Membership";
+  };
+
+  const getPaymentMemberOutstanding = (member, payment) => {
+    return payment?.kind === "pt"
+      ? Number(member?.ptDueNowAmount ?? member?.ptRemainingAmount ?? 0)
+      : Number(member?.dueNowAmount ?? member?.remainingAmount ?? 0);
+  };
+
   const openWhatsApp = (member, payment) => {
     const phone = normalizePhone(member?.phone);
     if (!phone) {
@@ -676,9 +808,11 @@ const MembersList = () => {
     const cycleLabel = payment.paymentMonth || formatAllocationRanges(payment.allocations);
     const paymentDate = formatDateTime(payment.at);
     const receivedBy = payment.by?.name || "Unknown";
-    const totalOutstanding = getMemberOutstanding(member);
+    const totalOutstanding = getPaymentMemberOutstanding(member, payment);
+    const kindLabel = getPaymentKindLabel(payment);
     const message =
       `Payment Receipt\n` +
+      `Type: ${kindLabel}\n` +
       `Member: ${member.name || "-"}\n` +
       `Cycle: ${cycleLabel}\n` +
       `Amount: ${payment.amount ?? 0}\n` +
@@ -687,6 +821,18 @@ const MembersList = () => {
       `Outstanding: ${totalOutstanding}\n\n`;
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const buildCombinedHistory = (member) => {
+    const membershipEntries = Array.isArray(member?.paymentHistory)
+      ? member.paymentHistory.map((payment) => ({ ...payment, kind: "membership" }))
+      : [];
+    const ptEntries = Array.isArray(member?.ptPaymentHistory)
+      ? member.ptPaymentHistory.map((payment) => ({ ...payment, kind: "pt" }))
+      : [];
+    return [...membershipEntries, ...ptEntries]
+      .sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0))
+      .slice(0, 8);
   };
 
 
@@ -874,6 +1020,40 @@ const MembersList = () => {
     }
   };
 
+  const submitPTPayment = async (e) => {
+    e.preventDefault();
+    if (!ptPayMember?._id) return;
+    const selectedMonthBalance = Number(ptPayMonthSummary?.balance || 0);
+    const enteredAmount = Number(ptPayAmount || 0);
+    const needsPromiseDate = enteredAmount > 0 && enteredAmount < selectedMonthBalance;
+    setSubmittingPTPayment(true);
+    try {
+      const payload = {
+        amount: enteredAmount,
+        note: ptPayNote,
+        date: ptPayDate,
+        paymentMonth: ptPayMonth,
+        paymentMode: ptPayMode,
+        promiseDate: needsPromiseDate ? ptPromiseDate || undefined : undefined,
+      };
+      const res = await axios.post(
+        `${BASE_URL}/api/v1/members/${ptPayMember._id}/pt-pay`,
+        payload
+      );
+      if (res.data?.success) {
+        toast.success("PT payment added");
+        fetchMembers();
+        closePTPay();
+      } else {
+        toast.error(res.data?.message || "Failed to add PT payment");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to add PT payment");
+    } finally {
+      setSubmittingPTPayment(false);
+    }
+  };
+
   const updateMemberStatus = async (member, nextStatus) => {
     if (!member?._id) return;
     setStatusUpdatingId(member._id);
@@ -901,6 +1081,11 @@ const MembersList = () => {
     Number(payMonthSummary?.balance || 0) - Number(payAmount || 0),
     0
   );
+  const ptPayMonthSummary = ptPayMember ? {
+    expectedFee: getPTExpectedFeeForMonth(ptPayMember, ptPayMonth),
+    balance: getPTSelectedMonthCycleDue(ptPayMember, ptPayMonth),
+  } : null;
+  const ptPayMemberOutstanding = getPTMemberOutstanding(ptPayMember);
   const memberLedger = buildMemberLedger(selectedMember);
 
   return (
@@ -1157,6 +1342,10 @@ const MembersList = () => {
                   <th className="px-4 py-3">Fee</th>
                   <th className="px-4 py-3">Paid</th>
                   <th className="px-4 py-3">Remaining</th>
+                  <th className="px-4 py-3">PT Status</th>
+                  <th className="px-4 py-3">PT Fee</th>
+                  <th className="px-4 py-3">PT Due</th>
+                  <th className="px-4 py-3">Total Due</th>
                   <th className="px-4 py-3">Payment</th>
                   <th className="px-4 py-3">Member</th>
                   <th className="px-4 py-3">Entry Date</th>
@@ -1170,7 +1359,7 @@ const MembersList = () => {
               <tbody>
                 {members.length === 0 && (
                   <tr>
-                    <td className="px-4 py-6 text-center text-gray-300" colSpan={16}>
+                    <td className="px-4 py-6 text-center text-gray-300" colSpan={20}>
                       No members found
                     </td>
                   </tr>
@@ -1214,6 +1403,10 @@ const MembersList = () => {
                     <td className="px-4 py-3">
                       {getMemberOutstanding(m)}
                     </td>
+                    <td className="px-4 py-3">{m.displayPTPaymentStatus || m.ptPaymentStatus || m.ptStatus || "-"}</td>
+                    <td className="px-4 py-3">{m.ptFee ?? 0}</td>
+                    <td className="px-4 py-3">{getPTMemberOutstanding(m)}</td>
+                    <td className="px-4 py-3">{getCombinedOutstanding(m)}</td>
                     <td className="px-4 py-3">{m.displayPaymentStatus || m.paymentStatus}</td>
                     <td className="px-4 py-3">{m.memberStatus || "Active"}</td>
                     <td className="px-4 py-3">
@@ -1247,6 +1440,13 @@ const MembersList = () => {
                           className="inline-flex items-center justify-center px-3 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
                         >
                           Pay
+                        </button>
+                        <button
+                          onClick={() => openPTPay(m)}
+                          disabled={m.ptStatus !== "Active"}
+                          className="inline-flex items-center justify-center px-3 py-1 rounded bg-emerald-700 text-white hover:bg-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          PT Pay
                         </button>
                         <button
                           onClick={() => openHistory(m)}
@@ -1618,6 +1818,50 @@ const MembersList = () => {
                   </tbody>
                 </table>
               )}
+              {selectedMember?.ptPaymentHistory && selectedMember.ptPaymentHistory.length > 0 && (
+                <div className="mt-5">
+                  <div className="text-sm font-semibold text-white mb-2">PT Payment History</div>
+                  <table className="min-w-full text-left text-sm text-gray-200">
+                    <thead className="bg-gray-800 text-gray-100">
+                      <tr>
+                        <th className="px-3 py-2">Amount</th>
+                        <th className="px-3 py-2">Month</th>
+                        <th className="px-3 py-2">Mode</th>
+                        <th className="px-3 py-2">Date</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...selectedMember.ptPaymentHistory].map((p, idx) => (
+                        <tr key={`pt-${p.at || "row"}-${idx}`} className="border-b border-gray-800">
+                          <td className="px-3 py-2">{Number(p.amount || 0)}</td>
+                          <td className="px-3 py-2">{p.paymentMonth || "-"}</td>
+                          <td className="px-3 py-2">{p.paymentMode || "-"}</td>
+                          <td className="px-3 py-2">{formatDateTime(p.at)}</td>
+                          <td className="px-3 py-2">{p.paymentStatus || "-"}</td>
+                          <td className="px-3 py-2 text-right">
+                            <div className="space-x-2">
+                              <button
+                                onClick={() => buildPayslip(selectedMember, { ...p, kind: "pt" })}
+                                className="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500 transition-all"
+                              >
+                                Payslip
+                              </button>
+                              <button
+                                onClick={() => openWhatsApp(selectedMember, { ...p, kind: "pt" })}
+                                className="px-2 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                              >
+                                WhatsApp
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1822,6 +2066,139 @@ const MembersList = () => {
         </div>
       )}
 
+      {isPTPayOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 p-4 md:p-6">
+          <div className="mx-auto flex h-full w-full max-w-3xl items-center justify-center">
+            <div className="w-full max-h-[90vh] overflow-hidden rounded-2xl border border-gray-800 bg-gray-950 text-gray-100 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-gray-800 px-5 py-4">
+                <div className="text-lg font-semibold">
+                  Add PT Payment {ptPayMember?.name ? `• ${ptPayMember.name}` : ""}
+                </div>
+                <button
+                  onClick={closePTPay}
+                  disabled={submittingPTPayment}
+                  className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm hover:bg-gray-700 transition-all"
+                >
+                  Close
+                </button>
+              </div>
+              <form onSubmit={submitPTPayment} className="max-h-[calc(90vh-74px)] space-y-5 overflow-y-auto p-5">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                    <div className="text-xs uppercase tracking-[0.18em] text-emerald-200/80">
+                      PT Due
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white">
+                      Rs.{ptPayMemberOutstanding}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-4">
+                    <div className="text-xs uppercase tracking-[0.18em] text-blue-200/80">
+                      PT Fee
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white">
+                      Rs.{Number(ptPayMember?.ptFee || 0)}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-gray-800 bg-gray-900/80 p-4 text-sm text-gray-300">
+                  <div>Expected Fee ({ptPayMonth || "-"})</div>
+                  <div className="text-right">Rs.{Number(ptPayMonthSummary?.expectedFee || 0)}</div>
+                  <div>Balance Before Payment</div>
+                  <div className="text-right">Rs.{Number(ptPayMonthSummary?.balance || 0)}</div>
+                  <div>Balance After This Payment</div>
+                  <div className="text-right">
+                    Rs.{Math.max(Number(ptPayMonthSummary?.balance || 0) - Number(ptPayAmount || 0), 0)}
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-sm text-gray-300 mb-1">Month</label>
+                  <select
+                    value={ptPayMonth}
+                    onChange={(e) => setPTPayMonth(e.target.value)}
+                    className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
+                    required
+                  >
+                    <option value="">Select month</option>
+                    {ptPayMonthOptions.map((month) => (
+                      <option key={month} value={month}>
+                        {month}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-sm text-gray-300 mb-1">Amount</label>
+                  <input
+                    type="number"
+                    value={ptPayAmount}
+                    onChange={(e) => setPTPayAmount(e.target.value)}
+                    className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-sm text-gray-300 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={ptPayDate}
+                    onChange={(e) => setPTPayDate(e.target.value)}
+                    className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
+                    required
+                  />
+                </div>
+                {Number(ptPayAmount || 0) > 0 &&
+                  Number(ptPayAmount || 0) < Number(ptPayMonthSummary?.balance || 0) && (
+                    <div className="flex flex-col">
+                      <label className="text-sm text-gray-300 mb-1">
+                        Remaining will be paid on
+                      </label>
+                      <input
+                        type="date"
+                        value={ptPromiseDate}
+                        onChange={(e) => setPTPromiseDate(e.target.value)}
+                        className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
+                      />
+                    </div>
+                  )}
+                <div className="flex flex-col">
+                  <label className="text-sm text-gray-300 mb-1">Payment Mode</label>
+                  <select
+                    value={ptPayMode}
+                    onChange={(e) => setPTPayMode(e.target.value)}
+                    className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
+                    required
+                  >
+                    <option>Cash</option>
+                    <option>UPI</option>
+                    <option>Card</option>
+                    <option>Bank Transfer</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-sm text-gray-300 mb-1">Note</label>
+                  <input
+                    type="text"
+                    value={ptPayNote}
+                    onChange={(e) => setPTPayNote(e.target.value)}
+                    className="rounded-xl border border-gray-700 bg-gray-800 px-4 py-3 text-base text-white outline-none transition-all focus:border-emerald-500"
+                    placeholder="Optional"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={submittingPTPayment}
+                  className="w-full rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-600 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {submittingPTPayment ? "Submitting..." : "Submit PT Payment"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isMember360Open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="bg-gray-900 text-gray-100 w-full max-w-5xl rounded-lg shadow-lg">
@@ -1854,11 +2231,32 @@ const MembersList = () => {
                     </div>
                     <div className="p-3 bg-gray-800 rounded border border-gray-700">
                       <div className="text-xs text-gray-400">Total Due</div>
-                      <div className="text-lg font-semibold">Rs.{getMemberOutstanding(member360Data)}</div>
+                      <div className="text-lg font-semibold">Rs.{getCombinedOutstanding(member360Data)}</div>
                     </div>
                     <div className="p-3 bg-gray-800 rounded border border-gray-700">
                       <div className="text-xs text-gray-400">Current Fee</div>
                       <div className="text-lg font-semibold">Rs.{Number(member360Data.fee || 0)}</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+                    <div className="p-3 bg-gray-800 rounded border border-gray-700">
+                      <div className="text-xs text-gray-400">PT Status</div>
+                      <div className="text-lg font-semibold">{member360Data.displayPTPaymentStatus || member360Data.ptPaymentStatus || member360Data.ptStatus || "-"}</div>
+                    </div>
+                    <div className="p-3 bg-gray-800 rounded border border-gray-700">
+                      <div className="text-xs text-gray-400">PT Start</div>
+                      <div className="text-lg font-semibold">
+                        {member360Data.ptStartDate ? formatDate(member360Data.ptStartDate) : "-"}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-gray-800 rounded border border-gray-700">
+                      <div className="text-xs text-gray-400">PT Fee</div>
+                      <div className="text-lg font-semibold">Rs.{Number(member360Data.ptFee || 0)}</div>
+                    </div>
+                    <div className="p-3 bg-gray-800 rounded border border-gray-700">
+                      <div className="text-xs text-gray-400">PT Due</div>
+                      <div className="text-lg font-semibold">Rs.{Number(member360Data.ptDueNowAmount ?? member360Data.ptRemainingAmount ?? 0)}</div>
                     </div>
                   </div>
 
@@ -1896,31 +2294,69 @@ const MembersList = () => {
                   </div>
 
                   <div className="mb-5">
+                    <div className="text-sm font-semibold mb-2">PT Cycle</div>
+                    {(() => {
+                      const cycles = Array.isArray(member360Data.ptPaymentCycles) ? member360Data.ptPaymentCycles : [];
+                      const currentPTCycle = member360Data.ptCurrentCycle || (cycles.length ? cycles[cycles.length - 1] : null);
+                      if (!currentPTCycle) return <div className="text-sm text-gray-300">No PT cycle found.</div>;
+                      return (
+                        <div className="p-4 bg-gray-800 rounded border border-gray-700">
+                          <div className="text-sm text-gray-300">Start: {formatDate(currentPTCycle.startDate)}</div>
+                          <div className="text-sm text-gray-300">End: {formatDate(currentPTCycle.endDate)}</div>
+                          <div className="text-sm text-gray-300">Fee: Rs.{Number(currentPTCycle.fee || 0)}</div>
+                          <div className="text-sm text-gray-300">Paid: Rs.{Number(currentPTCycle.paidAmount || 0)}</div>
+                          <div className="text-sm text-gray-300">Due: Rs.{Number(currentPTCycle.remainingAmount || 0)}</div>
+                          <div className="text-sm text-gray-300">Status: {currentPTCycle.status || "-"}</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="mb-5">
                     <div className="text-sm font-semibold mb-2">Recent Payments</div>
                     <div className="overflow-x-auto">
                       <table className="min-w-full text-left text-sm text-gray-200">
                         <thead className="bg-gray-800 text-gray-100">
                           <tr>
                             <th className="px-3 py-2">Amount</th>
+                            <th className="px-3 py-2">Type</th>
                             <th className="px-3 py-2">Month</th>
                             <th className="px-3 py-2">Mode</th>
                             <th className="px-3 py-2">Date</th>
                             <th className="px-3 py-2">Status</th>
+                            <th className="px-3 py-2 text-right">Action</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {(Array.isArray(member360Data.paymentHistory) ? [...member360Data.paymentHistory].reverse().slice(0, 8) : []).map((p, idx) => (
+                          {buildCombinedHistory(member360Data).map((p, idx) => (
                             <tr key={`${p.at || "p"}-${idx}`} className="border-b border-gray-800">
                               <td className="px-3 py-2">{Number(p.amount || 0)}</td>
+                              <td className="px-3 py-2">{getPaymentKindLabel(p)}</td>
                               <td className="px-3 py-2">{p.paymentMonth || "-"}</td>
                               <td className="px-3 py-2">{p.paymentMode || "-"}</td>
                               <td className="px-3 py-2">{formatDateTime(p.at)}</td>
                               <td className="px-3 py-2">{p.paymentStatus || "-"}</td>
+                              <td className="px-3 py-2 text-right">
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={() => buildPayslip(member360Data, p)}
+                                    className="px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-500 transition-all"
+                                  >
+                                    Payslip
+                                  </button>
+                                  <button
+                                    onClick={() => openWhatsApp(member360Data, p)}
+                                    className="px-2 py-1 rounded bg-green-600 text-white hover:bg-green-500 transition-all"
+                                  >
+                                    WhatsApp
+                                  </button>
+                                </div>
+                              </td>
                             </tr>
                           ))}
-                          {(!Array.isArray(member360Data.paymentHistory) || member360Data.paymentHistory.length === 0) && (
+                          {buildCombinedHistory(member360Data).length === 0 && (
                             <tr>
-                              <td className="px-3 py-2 text-gray-400" colSpan={5}>No payment history</td>
+                              <td className="px-3 py-2 text-gray-400" colSpan={7}>No payment history</td>
                             </tr>
                           )}
                         </tbody>
